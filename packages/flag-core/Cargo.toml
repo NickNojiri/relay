@@ -1,0 +1,12 @@
+[package]
+name = "flag-core"
+description = "Relay feature-flag rule-evaluation core (the one verified engine)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
