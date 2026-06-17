@@ -1,0 +1,576 @@
+[
+  {
+    "flag": {
+      "key": "prompt.support-bot",
+      "enabled": true,
+      "rolloutBps": 10000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 5000,
+          "promptVersionId": null
+        },
+        {
+          "key": "B",
+          "weightBps": 5000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-0",
+    "expected": {
+      "enabled": true,
+      "variant": "A",
+      "reason": "rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.support-bot",
+      "enabled": true,
+      "rolloutBps": 10000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 5000,
+          "promptVersionId": null
+        },
+        {
+          "key": "B",
+          "weightBps": 5000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-1",
+    "expected": {
+      "enabled": true,
+      "variant": "B",
+      "reason": "rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.support-bot",
+      "enabled": true,
+      "rolloutBps": 10000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 5000,
+          "promptVersionId": null
+        },
+        {
+          "key": "B",
+          "weightBps": 5000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-2",
+    "expected": {
+      "enabled": true,
+      "variant": "B",
+      "reason": "rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.support-bot",
+      "enabled": true,
+      "rolloutBps": 10000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 5000,
+          "promptVersionId": null
+        },
+        {
+          "key": "B",
+          "weightBps": 5000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-3",
+    "expected": {
+      "enabled": true,
+      "variant": "A",
+      "reason": "rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.support-bot",
+      "enabled": true,
+      "rolloutBps": 10000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 5000,
+          "promptVersionId": null
+        },
+        {
+          "key": "B",
+          "weightBps": 5000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-4",
+    "expected": {
+      "enabled": true,
+      "variant": "A",
+      "reason": "rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.support-bot",
+      "enabled": true,
+      "rolloutBps": 10000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 5000,
+          "promptVersionId": null
+        },
+        {
+          "key": "B",
+          "weightBps": 5000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-5",
+    "expected": {
+      "enabled": true,
+      "variant": "B",
+      "reason": "rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.support-bot",
+      "enabled": true,
+      "rolloutBps": 10000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 5000,
+          "promptVersionId": null
+        },
+        {
+          "key": "B",
+          "weightBps": 5000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-6",
+    "expected": {
+      "enabled": true,
+      "variant": "B",
+      "reason": "rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.support-bot",
+      "enabled": true,
+      "rolloutBps": 10000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 5000,
+          "promptVersionId": null
+        },
+        {
+          "key": "B",
+          "weightBps": 5000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-7",
+    "expected": {
+      "enabled": true,
+      "variant": "A",
+      "reason": "rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.support-bot",
+      "enabled": true,
+      "rolloutBps": 10000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 5000,
+          "promptVersionId": null
+        },
+        {
+          "key": "B",
+          "weightBps": 5000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-8",
+    "expected": {
+      "enabled": true,
+      "variant": "A",
+      "reason": "rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.support-bot",
+      "enabled": true,
+      "rolloutBps": 10000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 5000,
+          "promptVersionId": null
+        },
+        {
+          "key": "B",
+          "weightBps": 5000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-9",
+    "expected": {
+      "enabled": true,
+      "variant": "A",
+      "reason": "rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.off",
+      "enabled": false,
+      "rolloutBps": 10000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 10000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-1",
+    "expected": {
+      "enabled": false,
+      "variant": null,
+      "reason": "flag_disabled"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.zero",
+      "enabled": true,
+      "rolloutBps": 0,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 10000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-1",
+    "expected": {
+      "enabled": false,
+      "variant": null,
+      "reason": "out_of_rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.empty",
+      "enabled": true,
+      "rolloutBps": 10000,
+      "variants": []
+    },
+    "unitId": "user-1",
+    "expected": {
+      "enabled": true,
+      "variant": null,
+      "reason": "no_variants"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.tone",
+      "enabled": true,
+      "rolloutBps": 10000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 3000,
+          "promptVersionId": null
+        },
+        {
+          "key": "B",
+          "weightBps": 7000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-0",
+    "expected": {
+      "enabled": true,
+      "variant": "B",
+      "reason": "rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.tone",
+      "enabled": true,
+      "rolloutBps": 10000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 3000,
+          "promptVersionId": null
+        },
+        {
+          "key": "B",
+          "weightBps": 7000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-1",
+    "expected": {
+      "enabled": true,
+      "variant": "B",
+      "reason": "rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.tone",
+      "enabled": true,
+      "rolloutBps": 10000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 3000,
+          "promptVersionId": null
+        },
+        {
+          "key": "B",
+          "weightBps": 7000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-2",
+    "expected": {
+      "enabled": true,
+      "variant": "B",
+      "reason": "rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.tone",
+      "enabled": true,
+      "rolloutBps": 10000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 3000,
+          "promptVersionId": null
+        },
+        {
+          "key": "B",
+          "weightBps": 7000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-3",
+    "expected": {
+      "enabled": true,
+      "variant": "A",
+      "reason": "rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.tone",
+      "enabled": true,
+      "rolloutBps": 10000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 3000,
+          "promptVersionId": null
+        },
+        {
+          "key": "B",
+          "weightBps": 7000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-4",
+    "expected": {
+      "enabled": true,
+      "variant": "B",
+      "reason": "rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.tone",
+      "enabled": true,
+      "rolloutBps": 10000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 3000,
+          "promptVersionId": null
+        },
+        {
+          "key": "B",
+          "weightBps": 7000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-5",
+    "expected": {
+      "enabled": true,
+      "variant": "B",
+      "reason": "rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.beta",
+      "enabled": true,
+      "rolloutBps": 5000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 10000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-0",
+    "expected": {
+      "enabled": true,
+      "variant": "A",
+      "reason": "rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.beta",
+      "enabled": true,
+      "rolloutBps": 5000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 10000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-1",
+    "expected": {
+      "enabled": false,
+      "variant": null,
+      "reason": "out_of_rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.beta",
+      "enabled": true,
+      "rolloutBps": 5000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 10000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-2",
+    "expected": {
+      "enabled": false,
+      "variant": null,
+      "reason": "out_of_rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.beta",
+      "enabled": true,
+      "rolloutBps": 5000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 10000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-3",
+    "expected": {
+      "enabled": true,
+      "variant": "A",
+      "reason": "rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.beta",
+      "enabled": true,
+      "rolloutBps": 5000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 10000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-4",
+    "expected": {
+      "enabled": true,
+      "variant": "A",
+      "reason": "rollout"
+    }
+  },
+  {
+    "flag": {
+      "key": "prompt.beta",
+      "enabled": true,
+      "rolloutBps": 5000,
+      "variants": [
+        {
+          "key": "A",
+          "weightBps": 10000,
+          "promptVersionId": null
+        }
+      ]
+    },
+    "unitId": "user-5",
+    "expected": {
+      "enabled": false,
+      "variant": null,
+      "reason": "out_of_rollout"
+    }
+  }
+]
