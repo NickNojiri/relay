@@ -21,8 +21,10 @@ SDK) + **Python** (LLM gateway).
 - ✅ `@relay/flag-sdk` — pure-TS flag-eval engine: FNV-1a deterministic bucketing,
   basis-point rollout gate, weighted variant split, and a `FlagClient`. 6 passing tests.
   (Phase 4 swaps the eval internals for the native Rust binding behind the same API.)
+- ✅ `services/prompt-ops` — FastAPI gateway: resolves the variant via a Python port of the
+  flag engine (same FNV-1a vectors as the TS SDK — parity proven in pytest), proxies the
+  provider (Ollama default), and logs token+latency telemetry. 8 passing tests.
 - ⬜ `apps/studio` — Next.js: prompt editor → save version, flag admin, telemetry dashboard.
-- ⬜ `services/prompt-ops` — FastAPI gateway: resolve variant, proxy LLM, log telemetry.
 
 ## Flag model (single source of truth)
 A flag has `enabled`, `rolloutBps` (0..10000 basis points), and weighted `variants`
