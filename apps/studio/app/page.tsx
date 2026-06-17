@@ -9,19 +9,19 @@ const sections = [
     href: "/editor",
     title: "Prompt editor",
     desc: "Author a system prompt and save a version. Real-time co-editing arrives in Phase 3.",
-    ready: false,
+    ready: true,
   },
   {
     href: "/flags",
     title: "Flag admin",
     desc: "Create a rollout flag and split traffic across prompt versions.",
-    ready: false,
+    ready: true,
   },
   {
     href: "/telemetry",
     title: "Telemetry",
     desc: "Per-variant cost and latency, to see which prompt wins.",
-    ready: false,
+    ready: true,
   },
 ];
 
