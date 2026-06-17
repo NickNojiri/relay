@@ -1,0 +1,9 @@
+{
+  "extends": "@relay/typescript-config/base.json",
+  "compilerOptions": {
+    // flag-sdk is isomorphic (Node + browser + edge); DOM lib provides the
+    // standard TextEncoder used by the FNV-1a hasher.
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["src"]
+}

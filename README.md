@@ -1,22 +1,50 @@
-# Relay Monorepo
+# Relay
 
-## Current State
-**Phase 0 (Scaffolding)** and **Phase 1 (Shared Foundation)** are complete.
+**An end-to-end prompt-deployment platform.** Author a system prompt collaboratively,
+deploy it through an LLM gateway, A/B-test it with feature flags, and track cost &
+latency per variant. Polyglot monorepo: **Rust** (flag engine) + **TypeScript** (web +
+SDK) + **Python** (LLM gateway).
 
-- **Monorepo:** Configured using `pnpm` workspaces and Turborepo.
-- **Packages:**
-  - `@relay/db`: Drizzle ORM schema defined with Postgres integration (`prompts`, `promptVersions`, `flags`, `telemetry`).
-  - `@relay/core`: Shared Zod environment variables and Typescript types.
-  - `@relay/ui`: Tailwind CSS + shadcn foundational setup ready for Next.js usage.
-  - `@relay/typescript-config`: Centralized `tsconfig.json` bases.
+## Status
 
-## Next Steps: Phase 2 (Walking Skeleton)
-Future models should pick up at **Phase 2**, which involves:
-1. **`flag-sdk`**: Scaffold a pure-TypeScript stub for the feature flag evaluation engine.
-2. **`apps/studio`**: Create a Next.js (App Router) application.
-   - Build a prompt editor to save to the DB.
-   - Build an admin view to create a rollout flag.
-   - Build a telemetry dashboard.
-3. **`services/prompt-ops`**: Scaffold a FastAPI LLM gateway (Python) to proxy requests to an LLM provider, evaluate flags (using a Python stub), and log telemetry.
+| Phase | Scope | State |
+|------|-------|-------|
+| 0 | Polyglot monorepo scaffold (pnpm + Turborepo + cargo) | ✅ done |
+| 1 | Shared foundation: `@relay/db`, `@relay/core`, `@relay/ui` | ✅ done |
+| 2 | Walking skeleton (TS-stub engine + studio + gateway) | 🚧 in progress |
+| 3 | Real-time collab editing (Yjs CRDT + sync-server) | ⬜ |
+| 4 | Rust `flag-core` + 3 bindings (napi-rs / wasm / PyO3) + conformance | ⬜ |
+| 5 | Depth & ops (caching, multi-provider, A/B analytics, load test) | ⬜ |
+| 6 | Polish & deploy | ⬜ |
 
-See `.gemini/antigravity-ide/brain/.../task.md` and `implementation_plan.md` in the conversation artifacts for the full checklist and design documentation.
+### Phase 2 progress
+- ✅ `@relay/flag-sdk` — pure-TS flag-eval engine: FNV-1a deterministic bucketing,
+  basis-point rollout gate, weighted variant split, and a `FlagClient`. 6 passing tests.
+  (Phase 4 swaps the eval internals for the native Rust binding behind the same API.)
+- ⬜ `apps/studio` — Next.js: prompt editor → save version, flag admin, telemetry dashboard.
+- ⬜ `services/prompt-ops` — FastAPI gateway: resolve variant, proxy LLM, log telemetry.
+
+## Flag model (single source of truth)
+A flag has `enabled`, `rolloutBps` (0..10000 basis points), and weighted `variants`
+(each mapping to a `promptVersionId`). Evaluation is deterministic on a stable `unitId`,
+so the same user always lands in the same variant — and the TS engine and the future
+Rust engine produce identical decisions (verified by a conformance suite in Phase 4).
+
+## Packages
+- `@relay/flag-sdk` — feature-flag client + evaluation (standalone, no `@relay/*` deps).
+- `@relay/db` — Drizzle schema (`prompts`, `prompt_versions`, `flags`, `telemetry`) + client.
+- `@relay/core` — zod-validated env + shared domain types.
+- `@relay/ui` — Tailwind + shadcn design-system foundation.
+- `@relay/typescript-config`, `@relay/eslint-config` — shared tooling.
+
+## Develop
+
+```bash
+corepack pnpm install                                # JS deps (pnpm via corepack)
+docker compose -f infra/docker-compose.yml up -d     # Postgres + Redis
+corepack pnpm test                                   # run workspace tests
+corepack pnpm typecheck                              # typecheck workspace
+```
+
+The Rust flag engine (Phase 4) builds via the root `cargo` workspace; the Python gateway
+(`services/prompt-ops`) is managed with `uv`.

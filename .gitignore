@@ -15,6 +15,9 @@ target/
 **/*.wasm
 !**/src/**/*.wasm
 
+# stray installers (e.g. rustup-init.exe)
+*.exe
+
 # python
 __pycache__/
 .venv/
