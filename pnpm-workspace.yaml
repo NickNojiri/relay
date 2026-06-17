@@ -1,0 +1,11 @@
+# JavaScript/TypeScript workspace members.
+# Non-JS workspace members live in the Cargo workspace (Rust) or are Python packages:
+#   - packages/flag-core : Rust crate (cargo member)
+#   - packages/flag-py   : Python wheel via PyO3/maturin (not a pnpm package)
+#   - services/prompt-ops: Python FastAPI service (managed by uv, not a pnpm package)
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "!packages/flag-core" # Rust crate — see Cargo.toml workspace
+  - "!packages/flag-py" # Python wheel (PyO3/maturin)
+  - "services/sync-server" # Node service (services/prompt-ops is Python, excluded)

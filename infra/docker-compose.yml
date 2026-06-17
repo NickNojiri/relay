@@ -1,0 +1,36 @@
+# Local infra for Relay. `docker compose -f infra/docker-compose.yml up -d`
+# Postgres holds prompts/versions/flags/telemetry; Redis backs flag cache + sync presence.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: relay-postgres
+    environment:
+      POSTGRES_USER: relay
+      POSTGRES_PASSWORD: relay
+      POSTGRES_DB: relay
+    ports:
+      - "5432:5432"
+    volumes:
+      - relay_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U relay -d relay"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: relay-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - relay_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  relay_pg:
+  relay_redis:

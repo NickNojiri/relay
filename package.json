@@ -1,0 +1,24 @@
+{
+  "name": "relay",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Relay — an end-to-end prompt-deployment platform: author prompts collaboratively, deploy through an LLM gateway, A/B-test with feature flags, track cost & latency per variant.",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json,yml,yaml}\"",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "turbo": "^2.3.0",
+    "typescript": "^5.6.3"
+  }
+}

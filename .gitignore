@@ -1,0 +1,36 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# builds
+dist/
+build/
+.next/
+out/
+target/
+*.tsbuildinfo
+
+# native artifacts
+**/*.node
+**/*.wasm
+!**/src/**/*.wasm
+
+# python
+__pycache__/
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# env / secrets
+.env
+.env.local
+.env.*.local
+
+# turbo
+.turbo/
+
+# editor / os
+.DS_Store
+.idea/
+*.log
