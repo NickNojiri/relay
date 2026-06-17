@@ -20,5 +20,12 @@
     "prettier": "^3.3.3",
     "turbo": "^2.3.0",
     "typescript": "^5.6.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "vite": ">=6.4.3",
+      "esbuild": ">=0.25.0",
+      "postcss": ">=8.5.10"
+    }
   }
 }
