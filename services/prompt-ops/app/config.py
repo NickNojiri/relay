@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     relay_default_provider: str = "ollama"
     relay_default_model: str = "llama3.2"
+    relay_db_enabled: bool = False
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
 

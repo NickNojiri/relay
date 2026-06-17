@@ -5,7 +5,7 @@ from typing import Protocol
 
 import httpx
 
-from .config import get_settings
+from .config import Settings, get_settings
 
 
 @dataclass
@@ -55,6 +55,14 @@ class OllamaProvider:
         )
 
 
+def build_provider(settings: Settings) -> LLMProvider:
+    """Select a provider by config. `echo` enables a network-free end-to-end demo;
+    `ollama` is the default. (anthropic/openai arrive in Phase 5.)"""
+    if settings.relay_default_provider == "echo":
+        return EchoProvider()
+    return OllamaProvider(settings.ollama_base_url)
+
+
 def get_provider() -> LLMProvider:
     """Default FastAPI dependency — overridden with EchoProvider in tests."""
-    return OllamaProvider(get_settings().ollama_base_url)
+    return build_provider(get_settings())

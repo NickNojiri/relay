@@ -1,16 +1,32 @@
 from __future__ import annotations
 
 import time
+from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException
 
 from .config import Settings, get_settings
 from .flags import Decision, EvalContext, evaluate
 from .providers import LLMProvider, get_provider
-from .repository import Repository, TelemetryEvent, get_repository
+from .repository import Repository, TelemetryEvent, get_repository, set_pool
 from .schemas import ChatRequest, ChatResponse, Usage
 
-app = FastAPI(title="Relay prompt-ops", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    settings = get_settings()
+    pool = None
+    if settings.relay_db_enabled:
+        import asyncpg
+
+        pool = await asyncpg.create_pool(dsn=settings.database_url)
+        set_pool(pool)
+    yield
+    if pool is not None:
+        await pool.close()
+
+
+app = FastAPI(title="Relay prompt-ops", version="0.1.0", lifespan=lifespan)
 
 
 @app.get("/health")

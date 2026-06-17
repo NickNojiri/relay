@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 from .flags import FlagRule, FlagVariant
 
@@ -36,8 +37,7 @@ class Repository(Protocol):
 
 
 class InMemoryRepository:
-    """Standalone repo for tests + the seeded demo. A Postgres-backed impl arrives
-    once apps/studio is writing prompts/flags (same Protocol, drop-in)."""
+    """Standalone repo for tests + the seeded demo (no DB required)."""
 
     def __init__(self) -> None:
         self.flags: dict[str, FlagRule] = {}
@@ -60,6 +60,75 @@ class InMemoryRepository:
         self.telemetry.append(event)
 
 
+def _parse_variants(raw: Any) -> list[FlagVariant]:
+    items = json.loads(raw) if isinstance(raw, str) else (raw or [])
+    # Stored by studio via Drizzle in the TS FlagVariant shape (camelCase keys).
+    return [FlagVariant(v["key"], v["weightBps"], v.get("promptVersionId")) for v in items]
+
+
+class PostgresRepository:
+    """Reads prompts/flags and writes telemetry against the shared Postgres
+    (same schema @relay/db owns). Used when RELAY_DB_ENABLED is set."""
+
+    def __init__(self, pool: Any) -> None:
+        self._pool = pool
+
+    async def get_flag(self, key: str) -> FlagRule | None:
+        row = await self._pool.fetchrow(
+            "SELECT key, enabled, rollout_bps, variants FROM flags WHERE key = $1", key
+        )
+        if row is None:
+            return None
+        return FlagRule(
+            key=row["key"],
+            enabled=row["enabled"],
+            rollout_bps=row["rollout_bps"],
+            variants=_parse_variants(row["variants"]),
+        )
+
+    async def get_prompt_version(self, version_id: str) -> PromptVersion | None:
+        row = await self._pool.fetchrow(
+            "SELECT pv.id::text AS id, p.key AS prompt_key, pv.version, pv.body, "
+            "pv.provider, pv.model FROM prompt_versions pv "
+            "JOIN prompts p ON p.id = pv.prompt_id WHERE pv.id = $1::uuid",
+            version_id,
+        )
+        if row is None:
+            return None
+        return PromptVersion(
+            id=row["id"],
+            prompt_key=row["prompt_key"],
+            version=row["version"],
+            body=row["body"],
+            provider=row["provider"],
+            model=row["model"],
+        )
+
+    async def get_default_version_id(self, prompt_key: str) -> str | None:
+        row = await self._pool.fetchrow(
+            "SELECT pv.id::text AS id FROM prompt_versions pv "
+            "JOIN prompts p ON p.id = pv.prompt_id WHERE p.key = $1 "
+            "ORDER BY pv.version DESC LIMIT 1",
+            prompt_key,
+        )
+        return row["id"] if row else None
+
+    async def record_telemetry(self, event: TelemetryEvent) -> None:
+        await self._pool.execute(
+            "INSERT INTO telemetry (prompt_version_id, flag_key, variant, provider, "
+            "model, prompt_tokens, completion_tokens, latency_ms) "
+            "VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8)",
+            event.prompt_version_id,
+            event.flag_key,
+            event.variant,
+            event.provider,
+            event.model,
+            event.prompt_tokens,
+            event.completion_tokens,
+            event.latency_ms,
+        )
+
+
 def seed_demo() -> InMemoryRepository:
     repo = InMemoryRepository()
     repo.versions["v1"] = PromptVersion(
@@ -78,8 +147,18 @@ def seed_demo() -> InMemoryRepository:
 
 
 _default_repo = seed_demo()
+_pool: Any | None = None
+
+
+def set_pool(pool: Any) -> None:
+    """Called by the app lifespan when RELAY_DB_ENABLED is set."""
+    global _pool
+    _pool = pool
 
 
 def get_repository() -> Repository:
-    """Default FastAPI dependency — overridden with a fresh repo in tests."""
+    """Default FastAPI dependency: Postgres when a pool exists, else the seeded demo.
+    Overridden with a fresh in-memory repo in tests."""
+    if _pool is not None:
+        return PostgresRepository(_pool)
     return _default_repo
