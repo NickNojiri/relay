@@ -76,8 +76,9 @@ relay/
 | 2.5 | Studio editor / flag-admin / telemetry + gateway Postgres | ✅ |
 | 4a | Rust `flag-core` + 3-language conformance | ✅ |
 | 3 | Real-time collab editing (Yjs CRDT) | ✅ |
-| 4b | napi-rs / Wasm / PyO3 bindings | ⬜ |
-| 5–6 | Streaming + multi-provider, load-test, deploy | ⬜ |
+| 5 | Multi-provider (Claude/OpenAI/Ollama) + SSE streaming + flag cache | ◐ (load-test left) |
+| 6 | Deploy configs (Vercel + Fly + Docker) | ◐ |
+| 4b | napi-rs / Wasm / PyO3 bindings | ⬜ (needs MSVC/Linux) |
 
 ## Quickstart
 
@@ -101,7 +102,7 @@ deterministically. (On a TLS-intercepting network, add `--native-tls` to `uv` an
 | Suite | Result |
 |-------|--------|
 | `@relay/flag-sdk` (vitest) | 7 passing (incl. conformance) |
-| `prompt-ops` (pytest) | 11 passing + 1 skip (Postgres smoke) |
+| `prompt-ops` (pytest) | 15 passing + 1 skip (Postgres smoke) |
 | `flag-core` (cargo) | check + clippy clean; tests run on CI |
 | `studio` (next build) | 9 routes compile + type-check |
 
