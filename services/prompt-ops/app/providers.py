@@ -32,8 +32,9 @@ class EchoProvider:
 
 
 class OllamaProvider:
-    def __init__(self, base_url: str) -> None:
+    def __init__(self, base_url: str, transport: httpx.AsyncBaseTransport | None = None) -> None:
         self._base_url = base_url.rstrip("/")
+        self._transport = transport
 
     async def complete(self, *, model: str, system: str, user: str) -> Completion:
         payload = {
@@ -44,7 +45,7 @@ class OllamaProvider:
                 {"role": "user", "content": user},
             ],
         }
-        async with httpx.AsyncClient(timeout=120) as client:
+        async with httpx.AsyncClient(timeout=120, transport=self._transport) as client:
             resp = await client.post(f"{self._base_url}/api/chat", json=payload)
             resp.raise_for_status()
             data = resp.json()
@@ -55,11 +56,81 @@ class OllamaProvider:
         )
 
 
+class AnthropicProvider:
+    """Anthropic Messages API (https://api.anthropic.com/v1/messages)."""
+
+    def __init__(self, api_key: str, transport: httpx.AsyncBaseTransport | None = None) -> None:
+        self._api_key = api_key
+        self._transport = transport
+
+    async def complete(self, *, model: str, system: str, user: str) -> Completion:
+        payload = {
+            "model": model,
+            "max_tokens": 1024,
+            "system": system,
+            "messages": [{"role": "user", "content": user}],
+        }
+        headers = {
+            "x-api-key": self._api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        }
+        async with httpx.AsyncClient(timeout=120, transport=self._transport) as client:
+            resp = await client.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+        text = "".join(
+            block.get("text", "") for block in data.get("content", []) if block.get("type") == "text"
+        )
+        usage = data.get("usage", {})
+        return Completion(
+            text=text,
+            prompt_tokens=int(usage.get("input_tokens", 0)),
+            completion_tokens=int(usage.get("output_tokens", 0)),
+        )
+
+
+class OpenAIProvider:
+    """OpenAI Chat Completions API."""
+
+    def __init__(self, api_key: str, transport: httpx.AsyncBaseTransport | None = None) -> None:
+        self._api_key = api_key
+        self._transport = transport
+
+    async def complete(self, *, model: str, system: str, user: str) -> Completion:
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+        }
+        headers = {"authorization": f"Bearer {self._api_key}"}
+        async with httpx.AsyncClient(timeout=120, transport=self._transport) as client:
+            resp = await client.post(
+                "https://api.openai.com/v1/chat/completions", headers=headers, json=payload
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        choices = data.get("choices") or [{}]
+        text = choices[0].get("message", {}).get("content", "")
+        usage = data.get("usage", {})
+        return Completion(
+            text=text,
+            prompt_tokens=int(usage.get("prompt_tokens", 0)),
+            completion_tokens=int(usage.get("completion_tokens", 0)),
+        )
+
+
 def build_provider(settings: Settings) -> LLMProvider:
-    """Select a provider by config. `echo` enables a network-free end-to-end demo;
-    `ollama` is the default. (anthropic/openai arrive in Phase 5.)"""
-    if settings.relay_default_provider == "echo":
+    """Select a provider by config. `echo` is network-free; the rest proxy a real API."""
+    provider = settings.relay_default_provider
+    if provider == "echo":
         return EchoProvider()
+    if provider == "anthropic":
+        return AnthropicProvider(settings.anthropic_api_key or "")
+    if provider == "openai":
+        return OpenAIProvider(settings.openai_api_key or "")
     return OllamaProvider(settings.ollama_base_url)
 
 
