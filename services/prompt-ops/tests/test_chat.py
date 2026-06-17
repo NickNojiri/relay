@@ -60,3 +60,16 @@ def test_chat_is_deterministic_per_unit(seeded):
         json={"prompt_key": "prompt.support-bot", "unit_id": "user-7", "input": "b"},
     )
     assert r1.json()["variant"] == r2.json()["variant"]
+
+
+def test_chat_stream_emits_deltas_and_logs(seeded):
+    repo, client = seeded
+    r = client.post(
+        "/v1/chat/stream",
+        json={"prompt_key": "prompt.support-bot", "unit_id": "user-42", "input": "hi there friend"},
+    )
+    assert r.status_code == 200
+    body = r.text
+    assert "delta" in body
+    assert "done" in body
+    assert len(repo.telemetry) == 1

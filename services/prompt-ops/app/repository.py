@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -129,6 +130,34 @@ class PostgresRepository:
         )
 
 
+class CachedRepository:
+    """Wraps a repository with a short in-process TTL cache on flag lookups —
+    flags change rarely but are read on every request."""
+
+    def __init__(self, inner: Repository, ttl_seconds: float = 5.0) -> None:
+        self._inner = inner
+        self._ttl = ttl_seconds
+        self._flags: dict[str, tuple[float, FlagRule | None]] = {}
+
+    async def get_flag(self, key: str) -> FlagRule | None:
+        now = time.monotonic()
+        cached = self._flags.get(key)
+        if cached is not None and now - cached[0] < self._ttl:
+            return cached[1]
+        value = await self._inner.get_flag(key)
+        self._flags[key] = (now, value)
+        return value
+
+    async def get_prompt_version(self, version_id: str) -> PromptVersion | None:
+        return await self._inner.get_prompt_version(version_id)
+
+    async def get_default_version_id(self, prompt_key: str) -> str | None:
+        return await self._inner.get_default_version_id(prompt_key)
+
+    async def record_telemetry(self, event: TelemetryEvent) -> None:
+        await self._inner.record_telemetry(event)
+
+
 def seed_demo() -> InMemoryRepository:
     repo = InMemoryRepository()
     repo.versions["v1"] = PromptVersion(
@@ -147,18 +176,16 @@ def seed_demo() -> InMemoryRepository:
 
 
 _default_repo = seed_demo()
-_pool: Any | None = None
+_cached_repo: Repository | None = None
 
 
 def set_pool(pool: Any) -> None:
     """Called by the app lifespan when RELAY_DB_ENABLED is set."""
-    global _pool
-    _pool = pool
+    global _cached_repo
+    _cached_repo = CachedRepository(PostgresRepository(pool))
 
 
 def get_repository() -> Repository:
-    """Default FastAPI dependency: Postgres when a pool exists, else the seeded demo.
-    Overridden with a fresh in-memory repo in tests."""
-    if _pool is not None:
-        return PostgresRepository(_pool)
-    return _default_repo
+    """Default FastAPI dependency: cached Postgres when a pool exists, else the
+    seeded demo. Overridden with a fresh in-memory repo in tests."""
+    return _cached_repo if _cached_repo is not None else _default_repo

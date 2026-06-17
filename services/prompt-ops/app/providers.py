@@ -30,6 +30,10 @@ class EchoProvider:
             completion_tokens=len(user.split()),
         )
 
+    async def stream(self, *, model: str, system: str, user: str):
+        for token in user.split():
+            yield token + " "
+
 
 class OllamaProvider:
     def __init__(self, base_url: str, transport: httpx.AsyncBaseTransport | None = None) -> None:
