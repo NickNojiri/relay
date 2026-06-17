@@ -24,7 +24,12 @@ SDK) + **Python** (LLM gateway).
 - ✅ `services/prompt-ops` — FastAPI gateway: resolves the variant via a Python port of the
   flag engine (same FNV-1a vectors as the TS SDK — parity proven in pytest), proxies the
   provider (Ollama default), and logs token+latency telemetry. 8 passing tests.
-- ⬜ `apps/studio` — Next.js: prompt editor → save version, flag admin, telemetry dashboard.
+- ◐ `apps/studio` — Next.js App Router shell wired to the `@relay/ui` design tokens, with a
+  **playground** that drives the full loop through the gateway (`/api/chat` → prompt-ops).
+  `next build` passes (6 routes). Editor / flag-admin / telemetry dashboards are next.
+
+**The walking skeleton runs end-to-end:** studio playground → `/api/chat` → prompt-ops →
+deterministic flag decision → provider (Ollama) → token+latency telemetry.
 
 ## Flag model (single source of truth)
 A flag has `enabled`, `rolloutBps` (0..10000 basis points), and weighted `variants`
