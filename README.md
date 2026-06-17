@@ -75,7 +75,7 @@ relay/
 | 2 | Walking skeleton (engine + gateway + studio playground) | ✅ |
 | 2.5 | Studio editor / flag-admin / telemetry + gateway Postgres | ✅ |
 | 4a | Rust `flag-core` + 3-language conformance | ✅ |
-| 3 | Real-time collab editing (Yjs CRDT) | ◐ scaffolding |
+| 3 | Real-time collab editing (Yjs CRDT) | ✅ |
 | 4b | napi-rs / Wasm / PyO3 bindings | ⬜ |
 | 5–6 | Streaming + multi-provider, load-test, deploy | ⬜ |
 

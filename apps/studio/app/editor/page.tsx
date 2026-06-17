@@ -1,6 +1,7 @@
 import { db, prompts, promptVersions } from "@relay/db";
 import { desc, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { CollabEditor } from "./CollabEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +80,16 @@ export default async function EditorPage() {
             </button>
           </div>
         </form>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="font-medium">Collaborative draft</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Open this page in two tabs — edits sync live via the Yjs CRDT sync-server.
+        </p>
+        <div className="mt-2">
+          <CollabEditor room="draft" />
+        </div>
       </section>
 
       <section className="mt-8">
