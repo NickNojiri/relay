@@ -78,7 +78,7 @@ relay/
 | 3 | Real-time collab editing (Yjs CRDT) | ✅ |
 | 5 | Multi-provider (Claude/OpenAI/Ollama) + SSE streaming + flag cache | ◐ (load-test left) |
 | 6 | Deploy configs (Vercel + Fly + Docker) | ◐ |
-| 4b | napi-rs / Wasm / PyO3 bindings | ⬜ (needs MSVC/Linux) |
+| 4b | napi-rs / Wasm / PyO3 bindings — **deferred** ([plan](docs/PHASE-4B-BINDINGS.md)) | ⬜ (CI/Linux) |
 
 ## Quickstart
 
