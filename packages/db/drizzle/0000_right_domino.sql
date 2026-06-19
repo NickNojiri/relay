@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS "flags" (
+CREATE TABLE "flags" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"key" text NOT NULL,
 	"enabled" boolean DEFAULT false NOT NULL,
@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS "flags" (
 	CONSTRAINT "flags_key_unique" UNIQUE("key")
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "prompt_versions" (
+CREATE TABLE "prompt_versions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"prompt_id" uuid NOT NULL,
 	"version" integer NOT NULL,
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS "prompt_versions" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "prompts" (
+CREATE TABLE "prompts" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"key" text NOT NULL,
 	"name" text NOT NULL,
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS "prompts" (
 	CONSTRAINT "prompts_key_unique" UNIQUE("key")
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "telemetry" (
+CREATE TABLE "telemetry" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"prompt_version_id" uuid,
 	"flag_key" text,
@@ -40,18 +40,8 @@ CREATE TABLE IF NOT EXISTS "telemetry" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-DO $$ BEGIN
- ALTER TABLE "prompt_versions" ADD CONSTRAINT "prompt_versions_prompt_id_prompts_id_fk" FOREIGN KEY ("prompt_id") REFERENCES "public"."prompts"("id") ON DELETE cascade ON UPDATE no action;
-EXCEPTION
- WHEN duplicate_object THEN null;
-END $$;
---> statement-breakpoint
-DO $$ BEGIN
- ALTER TABLE "telemetry" ADD CONSTRAINT "telemetry_prompt_version_id_prompt_versions_id_fk" FOREIGN KEY ("prompt_version_id") REFERENCES "public"."prompt_versions"("id") ON DELETE set null ON UPDATE no action;
-EXCEPTION
- WHEN duplicate_object THEN null;
-END $$;
---> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "prompt_versions_prompt_idx" ON "prompt_versions" USING btree ("prompt_id");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "telemetry_created_idx" ON "telemetry" USING btree ("created_at");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "telemetry_flag_idx" ON "telemetry" USING btree ("flag_key");
+ALTER TABLE "prompt_versions" ADD CONSTRAINT "prompt_versions_prompt_id_prompts_id_fk" FOREIGN KEY ("prompt_id") REFERENCES "public"."prompts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "telemetry" ADD CONSTRAINT "telemetry_prompt_version_id_prompt_versions_id_fk" FOREIGN KEY ("prompt_version_id") REFERENCES "public"."prompt_versions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "prompt_versions_prompt_idx" ON "prompt_versions" USING btree ("prompt_id");--> statement-breakpoint
+CREATE INDEX "telemetry_created_idx" ON "telemetry" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX "telemetry_flag_idx" ON "telemetry" USING btree ("flag_key");

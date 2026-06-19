@@ -31,9 +31,7 @@ export const promptVersions = pgTable(
     model: text("model"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => ({
-    promptIdx: index("prompt_versions_prompt_idx").on(t.promptId),
-  }),
+  (t) => [index("prompt_versions_prompt_idx").on(t.promptId)],
 );
 
 /** A feature flag governing rollout + A/B split for a prompt. */
@@ -65,8 +63,8 @@ export const telemetry = pgTable(
     latencyMs: integer("latency_ms").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => ({
-    createdIdx: index("telemetry_created_idx").on(t.createdAt),
-    flagIdx: index("telemetry_flag_idx").on(t.flagKey),
-  }),
+  (t) => [
+    index("telemetry_created_idx").on(t.createdAt),
+    index("telemetry_flag_idx").on(t.flagKey),
+  ],
 );

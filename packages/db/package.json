@@ -16,13 +16,13 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "drizzle-orm": "^0.33.0",
+    "drizzle-orm": "^0.45.2",
     "postgres": "^3.4.4"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
     "@relay/typescript-config": "workspace:*",
-    "drizzle-kit": "^0.24.0",
+    "drizzle-kit": "^0.31.0",
     "tsx": "^4.19.1",
     "typescript": "^5.6.3"
   }
