@@ -2,36 +2,65 @@
 
 import { useState } from "react";
 
-interface ChatResponse {
+interface Done {
   variant: string | null;
-  provider: string;
-  model: string;
-  output: string;
-  usage: { prompt_tokens: number; completion_tokens: number };
-  latency_ms: number;
+  latencyMs: number;
 }
 
 export default function PlaygroundPage() {
   const [promptKey, setPromptKey] = useState("prompt.support-bot");
   const [unitId, setUnitId] = useState("user-42");
   const [input, setInput] = useState("My order hasn't arrived yet.");
-  const [result, setResult] = useState<ChatResponse | null>(null);
+  const [output, setOutput] = useState("");
+  const [meta, setMeta] = useState<Done | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function run() {
     setLoading(true);
     setError(null);
-    setResult(null);
+    setOutput("");
+    setMeta(null);
     try {
-      const res = await fetch("/api/chat", {
+      const res = await fetch("/api/chat/stream", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ prompt_key: promptKey, unit_id: unitId, input }),
       });
-      const data = await res.json();
-      if (!res.ok) setError(data.error ?? "request failed");
-      else setResult(data as ChatResponse);
+      if (!res.ok || !res.body) {
+        const d = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(d.error ?? "request failed");
+        return;
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let acc = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split("\n\n");
+        buffer = events.pop() ?? "";
+        for (const evt of events) {
+          const match = evt.match(/^data: (.*)$/m);
+          const data = match?.[1];
+          if (!data) continue;
+          const payload = JSON.parse(data) as {
+            delta?: string;
+            done?: boolean;
+            variant?: string | null;
+            latencyMs?: number;
+          };
+          if (payload.delta) {
+            acc += payload.delta;
+            setOutput(acc);
+          }
+          if (payload.done) {
+            setMeta({ variant: payload.variant ?? null, latencyMs: payload.latencyMs ?? 0 });
+          }
+        }
+      }
     } catch (e) {
       setError(String(e));
     } finally {
@@ -46,9 +75,8 @@ export default function PlaygroundPage() {
       </a>
       <h1 className="mt-2 text-2xl font-semibold">Playground</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Routes through the <code>prompt-ops</code> gateway: the flag engine picks a variant
-        deterministically from <code>unit_id</code>, then the gateway proxies the LLM call and
-        logs telemetry.
+        Streams from the <code>prompt-ops</code> gateway: the flag engine picks a variant from{" "}
+        <code>unit_id</code>, then tokens stream back live as the model responds.
       </p>
 
       <div className="mt-6 space-y-3">
@@ -82,7 +110,7 @@ export default function PlaygroundPage() {
           disabled={loading}
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
         >
-          {loading ? "Running…" : "Run"}
+          {loading ? "Streaming…" : "Run"}
         </button>
       </div>
 
@@ -92,21 +120,17 @@ export default function PlaygroundPage() {
         </p>
       )}
 
-      {result && (
+      {(output || meta) && (
         <div className="mt-6 rounded-lg border p-4 text-sm">
-          <div className="flex flex-wrap gap-x-6 gap-y-1 text-muted-foreground">
-            <span>
-              variant: <b className="text-foreground">{result.variant ?? "—"}</b>
-            </span>
-            <span>
-              {result.provider}/{result.model}
-            </span>
-            <span>
-              {result.usage.prompt_tokens}+{result.usage.completion_tokens} tok
-            </span>
-            <span>{result.latency_ms} ms</span>
-          </div>
-          <pre className="mt-3 whitespace-pre-wrap break-words">{result.output}</pre>
+          {meta && (
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-muted-foreground">
+              <span>
+                variant: <b className="text-foreground">{meta.variant ?? "—"}</b>
+              </span>
+              <span>{meta.latencyMs} ms</span>
+            </div>
+          )}
+          <pre className="mt-3 whitespace-pre-wrap break-words">{output}</pre>
         </div>
       )}
     </main>
