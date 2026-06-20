@@ -1,0 +1,40 @@
+name: Deploy services
+
+# Deploys the two long-lived Fly services on push to main.
+# Studio (Next.js) is deployed by Vercel's GitHub integration, not here.
+# Requires repo secret: FLY_API_TOKEN.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/**"
+      - "packages/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+jobs:
+  prompt-ops:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: >
+          flyctl deploy --remote-only
+          --config services/prompt-ops/fly.toml
+          --dockerfile services/prompt-ops/Dockerfile
+          services/prompt-ops
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  sync-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: >
+          flyctl deploy --remote-only
+          --config services/sync-server/fly.toml
+          --dockerfile services/sync-server/Dockerfile
+          .
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
