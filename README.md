@@ -104,6 +104,9 @@ relay/
 | 6 | Deploy: configs + runbook + CI/CD — see **[docs/DEPLOY.md](docs/DEPLOY.md)** | ✅ ready |
 | 4b | Native Rust bindings (napi-rs / Wasm / PyO3) | ⏸️ deferred — **[plan](docs/PHASE-4B-BINDINGS.md)** |
 
+**What's next:** the remaining work, prioritized for maximum resume/portfolio impact, lives in
+**[docs/ROADMAP.md](docs/ROADMAP.md)** (ship live → measure → native bindings → hardening).
+
 **Security:** `pnpm audit` → **0 known vulnerabilities**. **Tests:** flag-sdk 7 (vitest) ·
 prompt-ops 15 (+1 skip, pytest) · flag-core `cargo check` + `clippy` clean · studio `next build`
 (9 routes).
