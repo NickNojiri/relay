@@ -34,7 +34,9 @@ flyctl secrets set \
   REDIS_URL="<upstash-url>" \
   ANTHROPIC_API_KEY="<key>" \
   RELAY_DB_ENABLED=true \
-  RELAY_DEFAULT_PROVIDER=anthropic
+  RELAY_DEFAULT_PROVIDER=anthropic \
+  RELAY_API_KEYS="<generate-a-long-random-key>" \
+  RELAY_RATE_LIMIT_PER_MINUTE=60
 flyctl deploy
 ```
 → `https://relay-prompt-ops.fly.dev` (health: `GET /health`).
@@ -54,6 +56,7 @@ commands). Set **Production** environment variables:
 | Var | Value |
 |-----|-------|
 | `PROMPT_OPS_URL` | `https://relay-prompt-ops.fly.dev` |
+| `PROMPT_OPS_API_KEY` | the key from `RELAY_API_KEYS` (the proxy authenticates server-side) |
 | `NEXT_PUBLIC_SYNC_URL` | `wss://relay-sync.fly.dev` |
 | `DATABASE_URL` | `<neon-url>` (for the editor/flags/telemetry Server Actions) |
 

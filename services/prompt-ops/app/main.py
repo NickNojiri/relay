@@ -19,6 +19,7 @@ from .repository import (
     set_pool,
 )
 from .schemas import ChatRequest, ChatResponse, Usage
+from .security import gateway_guard
 
 
 @asynccontextmanager
@@ -64,7 +65,7 @@ async def _resolve(req: ChatRequest, repo: Repository) -> tuple[PromptVersion, D
     return version, decision
 
 
-@app.post("/v1/chat", response_model=ChatResponse)
+@app.post("/v1/chat", response_model=ChatResponse, dependencies=[Depends(gateway_guard)])
 async def chat(
     req: ChatRequest,
     repo: Repository = Depends(get_repository),
@@ -104,7 +105,7 @@ async def chat(
     )
 
 
-@app.post("/v1/chat/stream")
+@app.post("/v1/chat/stream", dependencies=[Depends(gateway_guard)])
 async def chat_stream(
     req: ChatRequest,
     repo: Repository = Depends(get_repository),

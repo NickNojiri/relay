@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     relay_db_enabled: bool = False
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
+    # Gateway hardening (both opt-in; see app/security.py)
+    relay_api_keys: str = ""
+    relay_rate_limit_per_minute: int = 0
 
 
 @lru_cache
