@@ -56,23 +56,26 @@ only by the old dev machine, and the plan itself says to do it on Linux/GitHub A
 is now exactly where this work runs. This is the deepest keyword vein in the project: **Rust,
 FFI, WebAssembly, napi-rs, PyO3, cross-language testing**.
 
-- [ ] `flag-core`: serde-based `tests/conformance.rs` over `conformance/cases.json`.
-- [ ] `flag-node` (napi-rs) → wired into `@relay/flag-sdk` with the pure-TS path as fallback.
-- [ ] `flag-wasm` (wasm-bindgen / wasm-pack) → edge/browser path.
-- [ ] `flag-py` (PyO3 + maturin) → swapped into `prompt-ops` with the Python port as fallback.
-- [ ] CI jobs building all three bindings + running the cross-binding conformance suite.
+- [x] `flag-core`: serde-based `tests/conformance.rs` over `conformance/cases.json`.
+- [x] `flag-node` (napi-rs) → wired into `@relay/flag-sdk` with the pure-TS path as fallback.
+- [x] `flag-wasm` (wasm-bindgen / wasm-pack) → edge/browser path.
+- [x] `flag-py` (PyO3 + maturin) → swapped into `prompt-ops` with the Python port as fallback.
+- [x] CI jobs building all three bindings + running the cross-binding conformance suite.
 
-**Effort:** 2–3 days. **Acceptance:** unchanged from the 4b doc — TS, Python, Rust, and all
-three bindings assert identical decisions on the shared fixture file.
+**✅ Done** — acceptance met: TS, Python, Rust, and all three bindings assert identical
+decisions on the shared fixture file (see the updated [4b doc](PHASE-4B-BINDINGS.md)).
 
 ## Phase 10 — Hardening & presentation (interview-talk-track material)
 
 Each item here is a common interview question ("how would you productionize this?") answered
 in code, plus a keyword ATS filters look for.
 
-- [ ] **Auth:** API-key auth on the gateway + simple session auth on studio
+- [x] **Auth:** opt-in API-key auth on the gateway (`RELAY_API_KEYS`, Bearer / x-api-key,
+      constant-time compare); the studio proxy authenticates server-side
       (keywords: authentication, authorization, middleware).
-- [ ] **Rate limiting** on the gateway using the Redis that's already provisioned.
+- [x] **Rate limiting** on the gateway (`RELAY_RATE_LIMIT_PER_MINUTE`, per-key sliding
+      window, 429 + Retry-After; in-process per instance — Redis-backed is the
+      scale-out follow-up).
 - [ ] **Observability:** OpenTelemetry traces on the request path gateway → provider, surfaced
       in the telemetry dashboard (keywords: OpenTelemetry, distributed tracing, observability).
 - [ ] **E2E tests:** one Playwright flow — create prompt → flag it → run playground → see
@@ -96,8 +99,9 @@ becomes true at the marked phase; never put a bullet on the resume before its ph
 - Designed a deterministic **feature-flag engine in Rust** with TypeScript and Python ports,
   proving byte-identical behavior across all three via a **shared conformance test suite**
   (zero SDK drift).
-- (P9) Shipped the engine as **native bindings — napi-rs (Node), WebAssembly, and PyO3
-  (Python)** — so every runtime evaluates flags with one verified Rust core.
+- Shipped the engine as **native bindings — napi-rs (Node), WebAssembly, and PyO3
+  (Python)** — so every runtime evaluates flags with one verified Rust core, with
+  CI running the cross-binding conformance suite on every push.
 - Built **real-time collaborative editing** with CRDTs (**Yjs**) over WebSockets, supporting
   concurrent multi-user prompt drafting with presence/awareness.
 - Engineered a **multi-provider LLM gateway** (Anthropic Claude, OpenAI, Ollama) with **SSE
@@ -105,9 +109,12 @@ becomes true at the marked phase; never put a bullet on the resume before its ph
   p95 ⟨X⟩ ms.
 - (P8) Instrumented per-request token/latency **telemetry** enabling data-driven prompt A/B
   tests; demonstrated a ⟨Y⟩% cost difference between prompt variants in production.
-- Automated **CI/CD with GitHub Actions and Docker** (lint, typecheck, three test suites,
-  deploy-on-push to Fly.io); drove `pnpm audit` from 8 advisories to **0 known
-  vulnerabilities** via dependency upgrades (Next 15, React 19, Drizzle 0.45).
+- Hardened the public gateway with **API-key authentication** and per-key **rate limiting**
+  (constant-time comparison, sliding-window 429s with Retry-After), keeping keys
+  server-side behind a Next.js proxy.
+- Automated **CI/CD with GitHub Actions and Docker** (lint, typecheck, five test suites
+  across three languages, deploy-on-push to Fly.io); drove `pnpm audit` from 8 advisories
+  to **0 known vulnerabilities** via dependency upgrades (Next 15, React 19, Drizzle 0.45).
 
 ## ATS keyword coverage → where the project proves it
 
@@ -123,7 +130,8 @@ becomes true at the marked phase; never put a bullet on the resume before its ph
 | Microservices, distributed systems | studio + gateway + sync-server topology |
 | Testing (unit, integration, E2E), Vitest, pytest, Playwright | 3 suites today + Phase 10 |
 | Cloud (Vercel, Fly.io, serverless), performance/load testing | Phases 7–8 |
-| Authentication, observability, OpenTelemetry, rate limiting | Phase 10 |
+| Authentication, rate limiting | `services/prompt-ops/app/security.py` + studio proxy |
+| Observability, OpenTelemetry | Phase 10 (remaining) |
 
 **Sequence:** 7 → 8 → 9 → 10. If you only have one weekend: do 7 and 8, then put the live URL
 and the measured numbers on the resume — that's most of the value.

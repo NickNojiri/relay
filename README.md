@@ -60,11 +60,14 @@ which version performs better.
 
 ## The flag engine — one algorithm, three languages
 
-The rule for "which version does this user get?" is written **three times** — in **Rust**
-(`packages/flag-core`), **TypeScript** (`@relay/flag-sdk`), and **Python** (`prompt-ops`) — and
-a shared test file (`packages/flag-core/conformance/cases.json`) proves all three produce the
-*exact same answer* for every case. That "one verified core, zero drift" story is the headline
-engineering flex.
+The rule for "which version does this user get?" lives in one **Rust** core
+(`packages/flag-core`) that ships to every runtime as a **native binding**: a Node addon
+(`flag-node`, napi-rs), a **WebAssembly** build for edge/browsers (`flag-wasm`, wasm-bindgen),
+and a Python wheel (`flag-py`, PyO3). The **TypeScript** (`@relay/flag-sdk`) and **Python**
+(`prompt-ops`) ports remain as verified fallbacks, and a shared test file
+(`packages/flag-core/conformance/cases.json`) proves every engine — core, bindings, and both
+ports — produces the *exact same answer* for every case. That "one verified core, zero drift"
+story is the headline engineering flex.
 
 > **Why three languages?** The website is TypeScript, the gateway is Python, and the engine is
 > Rust for portability. Re-implementing the same logic and *proving* they match is exactly what
@@ -82,7 +85,10 @@ relay/
 │  └─ sync-server/         real-time collaboration server (Yjs CRDT over WebSockets)
 ├─ packages/
 │  ├─ flag-core/           the Rust flag-evaluation engine + the shared conformance test
-│  ├─ flag-sdk/            the TypeScript version of the engine
+│  ├─ flag-node/           native Node addon over flag-core (napi-rs)
+│  ├─ flag-wasm/           WebAssembly build of flag-core for edge/browsers (wasm-bindgen)
+│  ├─ flag-py/             Python wheel over flag-core (PyO3 + maturin)
+│  ├─ flag-sdk/            the TypeScript SDK (native engine when built, pure-TS fallback)
 │  ├─ db/                  database schema + migrations (Drizzle + Postgres)
 │  ├─ core/                shared settings + types
 │  ├─ ui/                  shared design system (Tailwind + shadcn)
@@ -102,14 +108,16 @@ relay/
 | 4a | Rust `flag-core` engine + 3-language conformance | ✅ |
 | 5 | Multi-provider (Claude/OpenAI/Ollama) + live streaming + flag cache | ✅ |
 | 6 | Deploy: configs + runbook + CI/CD — see **[docs/DEPLOY.md](docs/DEPLOY.md)** | ✅ ready |
-| 4b | Native Rust bindings (napi-rs / Wasm / PyO3) | ⏸️ deferred — **[plan](docs/PHASE-4B-BINDINGS.md)** |
+| 4b | Native Rust bindings (napi-rs / Wasm / PyO3) + cross-binding conformance | ✅ |
+| 10 | Hardening: gateway API-key auth + rate limiting | ✅ |
 
-**What's next:** the remaining work, prioritized for maximum resume/portfolio impact, lives in
-**[docs/ROADMAP.md](docs/ROADMAP.md)** (ship live → measure → native bindings → hardening).
+**What's next:** ship it live and measure it — the prioritized plan lives in
+**[docs/ROADMAP.md](docs/ROADMAP.md)**.
 
-**Security:** `pnpm audit` → **0 known vulnerabilities**. **Tests:** flag-sdk 7 (vitest) ·
-prompt-ops 15 (+1 skip, pytest) · flag-core `cargo check` + `clippy` clean · studio `next build`
-(9 routes).
+**Security:** `pnpm audit` → **0 known vulnerabilities**; opt-in gateway API keys + rate
+limiting. **Tests:** flag-sdk 10 (vitest, incl. native-engine conformance) · prompt-ops 24
+(pytest, incl. PyO3 conformance) · flag-core 7 (cargo, incl. the shared fixture) · flag-wasm 2
+(node:test) · `clippy` clean · studio `next build` (9 routes).
 
 ---
 
@@ -160,15 +168,16 @@ commands are the only steps that need your own (free) accounts.
   hash so it's stable and needs no database lookup.
 - **Monorepo** — one Git repository holding several apps/packages. **Polyglot** = in multiple
   programming languages (here Rust + TypeScript + Python).
-- **Binding (napi-rs / Wasm / PyO3)** — a wrapper that lets other languages call Rust code. (These
-  are the deferred Phase 4b — see the plan doc.)
+- **Binding (napi-rs / Wasm / PyO3)** — a wrapper that lets other languages call Rust code. Relay
+  ships all three, so Node, edge/browser, and Python all evaluate flags with the same Rust engine.
 
 ---
 
 ## Tech
 
-TypeScript · Rust · Python · Next.js (App Router, Server Actions) · FastAPI · Drizzle ORM ·
-Postgres · Redis · Yjs (CRDT) · Turborepo · pnpm · Cargo · Docker · Vitest · pytest · GitHub Actions.
+TypeScript · Rust · Python · Next.js (App Router, Server Actions) · FastAPI · napi-rs ·
+WebAssembly (wasm-bindgen) · PyO3/maturin · Drizzle ORM · Postgres · Redis · Yjs (CRDT) ·
+Turborepo · pnpm · Cargo · Docker · Vitest · pytest · GitHub Actions.
 
 ## License
 
