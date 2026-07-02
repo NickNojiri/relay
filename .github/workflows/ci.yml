@@ -26,21 +26,58 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
-  # Rust flag engine (packages/flag-core + Phase 4 bindings)
+  # Rust flag engine (packages/flag-core + the Phase 4b binding crates)
   rust:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo test --workspace
-      - run: cargo clippy --workspace -- -D warnings
+      - run: cargo test --workspace --features flag-core/serde
+      - run: cargo clippy --workspace --all-features -- -D warnings
 
-  # Python gateway (services/prompt-ops) + flag-py wheel (Phase 4)
+  # Python gateway (services/prompt-ops); pure-Python engine path
   python:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --project services/prompt-ops
+      - run: uv run --project services/prompt-ops pytest
+
+  # Phase 4b: build all three native bindings (napi / wasm / PyO3) and run the
+  # cross-binding conformance suites — every engine must produce the decisions
+  # in packages/flag-core/conformance/cases.json.
+  bindings:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: astral-sh/setup-uv@v5
+      - run: pnpm install --frozen-lockfile
+
+      # Node addon (napi-rs) → flag-sdk's evaluate() runs on the Rust engine
+      - run: pnpm --filter @relay/flag-node run build:napi
+      - name: Assert native addon loads
+        run: node -e "const m=require('./packages/flag-node'); if(typeof m.evaluateJson!=='function') process.exit(1)"
+      - run: pnpm --filter @relay/flag-sdk test
+
+      # WebAssembly (wasm-bindgen via wasm-pack)
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - run: pnpm --filter @relay/flag-wasm run build:node
+      - run: pnpm --filter @relay/flag-wasm test
+
+      # Python wheel (PyO3 + maturin) → gateway's evaluate() runs on the Rust engine
+      - run: uv sync --project services/prompt-ops --group native
+      - name: Assert native wheel imports
+        run: uv run --project services/prompt-ops python -c "import relay_flag_py"
       - run: uv run --project services/prompt-ops pytest

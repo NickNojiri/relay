@@ -25,13 +25,18 @@ fn bucket(flag_key: &str, unit_id: &str, salt: &str) -> u32 {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct FlagVariant {
     pub key: String,
     pub weight_bps: u32,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub prompt_version_id: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct FlagRule {
     pub key: String,
     pub enabled: bool,
@@ -40,6 +45,8 @@ pub struct FlagRule {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct Decision {
     pub enabled: bool,
     pub variant: Option<String>,
@@ -69,6 +76,16 @@ pub fn evaluate(rule: &FlagRule, unit_id: &str) -> Decision {
     // Weights summed to < 10000: assign the last variant.
     let last = rule.variants.last().expect("variants is non-empty");
     Decision { enabled: true, variant: Some(last.key.clone()), reason: "rollout" }
+}
+
+/// JSON-boundary evaluation shared by the napi / wasm / PyO3 bindings: takes the
+/// rule in the SDK's camelCase wire format, returns the decision the same way.
+/// Keeping the (de)serialization here means the bindings stay one-line wrappers.
+#[cfg(feature = "serde")]
+pub fn evaluate_json(rule_json: &str, unit_id: &str) -> Result<String, String> {
+    let rule: FlagRule =
+        serde_json::from_str(rule_json).map_err(|e| format!("invalid FlagRule JSON: {e}"))?;
+    serde_json::to_string(&evaluate(&rule, unit_id)).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

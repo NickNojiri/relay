@@ -1,0 +1,14 @@
+{
+  "name": "@relay/flag-wasm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WebAssembly build of the Relay flag engine (wasm-bindgen over flag-core) for edge/browser runtimes.",
+  "type": "module",
+  "main": "./pkg/flag_wasm.js",
+  "types": "./pkg/flag_wasm.d.ts",
+  "scripts": {
+    "build:web": "wasm-pack build --target web --out-dir pkg --release",
+    "build:node": "wasm-pack build --target nodejs --out-dir pkg-node --release",
+    "test": "node --test"
+  }
+}

@@ -477,6 +477,11 @@ wheels = [
 ]
 
 [[package]]
+name = "relay-flag-py"
+version = "0.1.0"
+source = { directory = "../../packages/flag-py" }
+
+[[package]]
 name = "relay-prompt-ops"
 version = "0.1.0"
 source = { virtual = "." }
@@ -494,6 +499,9 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
 ]
+native = [
+    { name = "relay-flag-py" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -510,6 +518,7 @@ dev = [
     { name = "pytest", specifier = ">=8.3" },
     { name = "pytest-asyncio", specifier = ">=0.24" },
 ]
+native = [{ name = "relay-flag-py", directory = "../../packages/flag-py" }]
 
 [[package]]
 name = "starlette"

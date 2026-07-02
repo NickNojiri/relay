@@ -1,0 +1,15 @@
+[package]
+name = "flag-py"
+description = "Python (PyO3) binding for the Relay flag-core engine."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lib]
+name = "relay_flag_py"
+crate-type = ["cdylib"]
+
+[dependencies]
+flag-core = { path = "../flag-core", features = ["serde"] }
+pyo3 = { version = "0.27", features = ["extension-module", "abi3-py311"] }

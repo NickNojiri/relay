@@ -14,6 +14,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
+  "optionalDependencies": {
+    "@relay/flag-node": "workspace:*"
+  },
   "devDependencies": {
     "@relay/eslint-config": "workspace:*",
     "@relay/typescript-config": "workspace:*",

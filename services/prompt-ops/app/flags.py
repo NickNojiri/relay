@@ -1,14 +1,21 @@
 """Python port of @relay/flag-sdk evaluation.
 
 Deliberately byte-for-byte equivalent to the TypeScript engine: same FNV-1a hash over
-UTF-8 bytes, same `flag:salt:unit` bucket keys, same basis-point logic. The Phase 4
-conformance suite pins TS, Python, and the Rust core to identical decisions; this module
-is what gets swapped for the native `flag-py` (PyO3) binding then.
+UTF-8 bytes, same `flag:salt:unit` bucket keys, same basis-point logic. When the native
+`relay-flag-py` wheel (PyO3 over the Rust flag-core, Phase 4b) is installed, `evaluate`
+routes through it; this pure-Python port stays as the fallback. The shared conformance
+suite pins every path to identical decisions.
 """
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
+
+try:  # optional native engine — `uv sync --group native` builds the wheel
+    import relay_flag_py as _native
+except ImportError:  # pragma: no cover - depends on the environment
+    _native = None
 
 _FNV_OFFSET = 0x811C9DC5
 _FNV_PRIME = 0x01000193
@@ -55,7 +62,38 @@ class Decision:
     reason: str
 
 
+def native_engine_active() -> bool:
+    return _native is not None
+
+
+def _rule_to_wire(rule: FlagRule) -> str:
+    """The camelCase JSON wire format shared by every flag-core binding."""
+    return json.dumps(
+        {
+            "key": rule.key,
+            "enabled": rule.enabled,
+            "rolloutBps": rule.rollout_bps,
+            "variants": [
+                {
+                    "key": v.key,
+                    "weightBps": v.weight_bps,
+                    "promptVersionId": v.prompt_version_id,
+                }
+                for v in rule.variants
+            ],
+        }
+    )
+
+
 def evaluate(rule: FlagRule, ctx: EvalContext) -> Decision:
+    if _native is not None:
+        raw = json.loads(_native.evaluate_json(_rule_to_wire(rule), ctx.unit_id))
+        return Decision(raw["enabled"], raw["variant"], raw["reason"])
+    return evaluate_py(rule, ctx)
+
+
+def evaluate_py(rule: FlagRule, ctx: EvalContext) -> Decision:
+    """Pure-Python reference evaluation (the fallback engine)."""
     if not rule.enabled:
         return Decision(False, None, "flag_disabled")
     if _bucket(rule.key, ctx.unit_id, "gate") >= rule.rollout_bps:

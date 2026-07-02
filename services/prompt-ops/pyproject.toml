@@ -17,9 +17,18 @@ dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
 ]
+# Native flag engine (PyO3 wheel built from packages/flag-py; needs a Rust
+# toolchain). Opt in with `uv sync --group native`; without it the pure-Python
+# port in app/flags.py is used.
+native = [
+    "relay-flag-py",
+]
 
 [tool.uv]
 package = false
+
+[tool.uv.sources]
+relay-flag-py = { path = "../../packages/flag-py" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
