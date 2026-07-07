@@ -78,15 +78,18 @@ in code, plus a keyword ATS filters look for.
 - [x] **Rate limiting** on the gateway (`RELAY_RATE_LIMIT_PER_MINUTE`, per-key sliding
       window, 429 + Retry-After; in-process per instance — Redis-backed is the
       scale-out follow-up).
-- [ ] **Observability:** OpenTelemetry traces on the request path gateway → provider, surfaced
-      in the telemetry dashboard (keywords: OpenTelemetry, distributed tracing, observability).
-- [ ] **E2E tests:** one Playwright flow — create prompt → flag it → run playground → see
-      telemetry (keywords: Playwright, end-to-end testing).
-- [ ] **Presentation:** 30–60s demo GIF in the README, CI + coverage badges, pinned repo with
-      a description + topics set on GitHub (recruiters *do* click).
+- [x] **Observability:** opt-in **OpenTelemetry** tracing (`RELAY_OTEL_ENABLED`) — FastAPI
+      server spans + `flag.resolve` / `provider.complete` child spans with variant / provider
+      / model / token attributes, OTLP-exported (keywords: OpenTelemetry, distributed tracing,
+      observability). See `services/prompt-ops/app/telemetry_otel.py`.
+- [x] **Presentation:** CI / license / language badges + a one-line highlight and a
+      **Performance** section in the README. *(A demo GIF + pinned-repo topics still want the
+      live deploy.)*
+- [ ] **E2E tests (remaining):** one Playwright flow — create prompt → flag it → run
+      playground → see telemetry — needs the full Postgres stack, so it lands with the deploy.
 
 **Effort:** 2–3 days, items independent — cherry-pick if time is short. Priority within the
-phase: presentation > auth > observability > rate limiting > e2e.
+phase: auth ✓ · rate limiting ✓ · observability ✓ · presentation ✓ · e2e (with deploy).
 
 ---
 
@@ -110,11 +113,15 @@ becomes true at the marked phase; never put a bullet on the resume before its ph
   token streaming** and a TTL flag cache; load-tested the routing path to **~620 req/s at
   9.6 ms median / 51 ms p95** with **zero errors** (single async worker) via a committed k6 +
   async harness.
-- (P8) Instrumented per-request token/latency **telemetry** enabling data-driven prompt A/B
-  tests; demonstrated a ⟨Y⟩% cost difference between prompt variants in production.
+- Instrumented per-request token/latency **telemetry** enabling data-driven prompt A/B
+  tests; per-variant cost/latency aggregates surface in the dashboard. *(A headline
+  "reduced cost X%" number needs the live A/B run — see Phase 8.)*
 - Hardened the public gateway with **API-key authentication** and per-key **rate limiting**
   (constant-time comparison, sliding-window 429s with Retry-After), keeping keys
   server-side behind a Next.js proxy.
+- Added **distributed tracing with OpenTelemetry** (OTLP-exported FastAPI + custom
+  spans for flag resolution and the provider call, tagged with variant / model / token
+  usage) for end-to-end request observability.
 - Automated **CI/CD with GitHub Actions and Docker** (lint, typecheck, five test suites
   across three languages, deploy-on-push to Fly.io); drove `pnpm audit` from 8 advisories
   to **0 known vulnerabilities** via dependency upgrades (Next 15, React 19, Drizzle 0.45).
@@ -131,10 +138,10 @@ becomes true at the marked phase; never put a bullet on the resume before its ph
 | LLM / GenAI / prompt engineering, A/B testing | the whole product; Anthropic/OpenAI providers |
 | CI/CD, GitHub Actions, Docker | `.github/workflows`, Dockerfiles, Fly deploy |
 | Microservices, distributed systems | studio + gateway + sync-server topology |
-| Testing (unit, integration, E2E), Vitest, pytest, Playwright | 3 suites today + Phase 10 |
+| Testing, Vitest, pytest, node:test, load testing | 5 suites across 3 languages; `loadtest/` (k6 + async) |
 | Cloud (Vercel, Fly.io, serverless), performance/load testing | Phases 7–8 |
 | Authentication, rate limiting | `services/prompt-ops/app/security.py` + studio proxy |
-| Observability, OpenTelemetry | Phase 10 (remaining) |
+| Observability, OpenTelemetry, distributed tracing | `services/prompt-ops/app/telemetry_otel.py` |
 
 **Sequence:** 7 → 8 → 9 → 10. If you only have one weekend: do 7 and 8, then put the live URL
 and the measured numbers on the resume — that's most of the value.

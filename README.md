@@ -1,5 +1,14 @@
 # Relay
 
+[![CI](https://github.com/NickNojiri/relay/actions/workflows/ci.yml/badge.svg)](https://github.com/NickNojiri/relay/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+![Rust](https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white)
+![WebAssembly](https://img.shields.io/badge/WebAssembly-654FF0?logo=webassembly&logoColor=white)
+
+_Rust flag engine · Next.js studio · FastAPI gateway · native napi/Wasm/PyO3 bindings · Yjs live collaboration · 0 audit vulns · ~620 req/s routing @ 9.6 ms p50._
+
 **An end-to-end prompt-deployment platform.** Author an AI system prompt, ship it through a
 gateway, A/B-test it with feature flags, and track cost & latency per version — so you can tell
 which prompt actually wins in production.
@@ -109,7 +118,8 @@ relay/
 | 5 | Multi-provider (Claude/OpenAI/Ollama) + live streaming + flag cache | ✅ |
 | 6 | Deploy: configs + runbook + CI/CD — see **[docs/DEPLOY.md](docs/DEPLOY.md)** | ✅ ready |
 | 4b | Native Rust bindings (napi-rs / Wasm / PyO3) + cross-binding conformance | ✅ |
-| 10 | Hardening: gateway API-key auth + rate limiting | ✅ |
+| 10 | Hardening: API-key auth · rate limiting · OpenTelemetry tracing · perf-benchmarked | ✅ |
+| 7–8 | Live deploy + production numbers (needs hosting accounts) | ⏳ next |
 
 **What's next:** ship it live and measure it — the prioritized plan lives in
 **[docs/ROADMAP.md](docs/ROADMAP.md)**.
@@ -200,7 +210,7 @@ commands are the only steps that need your own (free) accounts.
 
 TypeScript · Rust · Python · Next.js (App Router, Server Actions) · FastAPI · napi-rs ·
 WebAssembly (wasm-bindgen) · PyO3/maturin · Drizzle ORM · Postgres · Redis · Yjs (CRDT) ·
-Turborepo · pnpm · Cargo · Docker · Vitest · pytest · GitHub Actions.
+Turborepo · pnpm · Cargo · Docker · Vitest · pytest · k6/async load-testing · OpenTelemetry · GitHub Actions.
 
 ## License
 
