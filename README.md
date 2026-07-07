@@ -121,6 +121,29 @@ limiting. **Tests:** flag-sdk 10 (vitest, incl. native-engine conformance) · pr
 
 ---
 
+## Performance
+
+Measured against a local single-worker gateway (Uvicorn) with the network-free `echo`
+provider, so the numbers isolate the **flag-eval + routing + telemetry overhead** — the work
+Relay adds on top of the LLM call — rather than model latency. Reproduce with the committed
+harness (`services/prompt-ops/loadtest/bench.py`, or `flag-eval.k6.js` if you have k6):
+
+```
+RELAY_DEFAULT_PROVIDER=echo uv run uvicorn app.main:app --port 8000   # terminal A
+uv run python loadtest/bench.py --concurrency 10 --duration 15        # terminal B
+```
+
+| Concurrency | Throughput | p50 | p95 | p99 | Errors |
+|---|---|---|---|---|---|
+| 10 | **623 req/s** | **9.6 ms** | 51 ms | 88 ms | 0 / 9,356 |
+| 50 | 301 req/s | 110 ms | 490 ms | 843 ms | 0 / 9,077 |
+
+Sub-10 ms median routing overhead at a healthy load point; a single async worker saturates
+around c≈50 (the point to add workers / horizontal scale). Deterministic bucketing means the
+flag decision itself is an in-process FNV-1a hash with **no database round-trip**.
+
+---
+
 ## Run it on your own computer
 
 You need [Node](https://nodejs.org) and [Docker](https://www.docker.com/products/docker-desktop/);

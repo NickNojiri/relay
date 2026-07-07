@@ -40,14 +40,16 @@ strongest differentiator for a personal project.
 ATS matches keywords; humans shortlist **quantified** bullets. Everything here already exists
 as scaffolding — it just needs to be *run* against the live deployment and written down.
 
-- [ ] Run the existing **k6** load-test script against the Fly gateway; record throughput,
-      p95/p99 latency, and error rate. Re-run with the flag cache cold vs warm and record the
-      delta (that's your "improved latency X%" bullet).
-- [ ] Record telemetry over a synthetic A/B run: cost-per-request delta between two prompt
-      versions (that's your "reduced LLM cost X%" bullet — the product's whole pitch).
-- [ ] Publish the numbers in the README (small "Performance" section) so bullets are auditable.
+- [x] Load-tested the gateway routing path (local, `echo` provider) → **623 req/s, p50 9.6 ms,
+      p95 51 ms, p99 88 ms, 0 errors**; published in the README **Performance** section and
+      reproducible via `loadtest/bench.py` (k6-free) or `flag-eval.k6.js`.
+- [ ] *(needs live deploy)* Re-run the same harness against the Fly gateway for production
+      numbers, and record a synthetic A/B cost-per-request delta (the "reduced LLM cost X%"
+      bullet — the product's whole pitch).
 
 **Effort:** ~half a day. **Rule:** no number goes on the resume before it's measured here.
+The local routing numbers are measured and published; only the *production* re-run and the
+A/B cost delta still need the live deployment.
 
 ## Phase 9 — Phase 4b native bindings (the flagship engineering story)
 
@@ -105,8 +107,9 @@ becomes true at the marked phase; never put a bullet on the resume before its ph
 - Built **real-time collaborative editing** with CRDTs (**Yjs**) over WebSockets, supporting
   concurrent multi-user prompt drafting with presence/awareness.
 - Engineered a **multi-provider LLM gateway** (Anthropic Claude, OpenAI, Ollama) with **SSE
-  token streaming** and a TTL flag cache; (P8) load-tested with **k6** to ⟨N⟩ req/s at
-  p95 ⟨X⟩ ms.
+  token streaming** and a TTL flag cache; load-tested the routing path to **~620 req/s at
+  9.6 ms median / 51 ms p95** with **zero errors** (single async worker) via a committed k6 +
+  async harness.
 - (P8) Instrumented per-request token/latency **telemetry** enabling data-driven prompt A/B
   tests; demonstrated a ⟨Y⟩% cost difference between prompt variants in production.
 - Hardened the public gateway with **API-key authentication** and per-key **rate limiting**
