@@ -20,6 +20,7 @@ from .repository import (
 )
 from .schemas import ChatRequest, ChatResponse, Usage
 from .security import gateway_guard
+from .telemetry_otel import init_tracing, instrument_app, set_attributes, span
 
 
 @asynccontextmanager
@@ -37,6 +38,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Relay prompt-ops", version="0.1.0", lifespan=lifespan)
+# Opt-in distributed tracing (RELAY_OTEL_ENABLED); no-op otherwise.
+init_tracing(get_settings())
+instrument_app(app)
 
 
 @app.get("/health")
@@ -46,12 +50,14 @@ def health() -> dict[str, str]:
 
 async def _resolve(req: ChatRequest, repo: Repository) -> tuple[PromptVersion, Decision]:
     """Pick the variant via the flag engine and load its prompt version."""
-    flag = await repo.get_flag(req.prompt_key)
-    decision = (
-        evaluate(flag, EvalContext(unit_id=req.unit_id))
-        if flag is not None
-        else Decision(False, None, "flag_disabled")
-    )
+    with span("flag.resolve", **{"flag.key": req.prompt_key, "flag.unit_id": req.unit_id}) as s:
+        flag = await repo.get_flag(req.prompt_key)
+        decision = (
+            evaluate(flag, EvalContext(unit_id=req.unit_id))
+            if flag is not None
+            else Decision(False, None, "flag_disabled")
+        )
+        set_attributes(s, **{"flag.variant": decision.variant, "flag.reason": decision.reason})
     version_id: str | None = None
     if flag is not None and decision.variant is not None:
         version_id = next(
@@ -77,7 +83,15 @@ async def chat(
     model = version.model or settings.relay_default_model
 
     start = time.perf_counter()
-    completion = await provider.complete(model=model, system=version.body, user=req.input)
+    with span("provider.complete", **{"llm.provider": provider_name, "llm.model": model}) as s:
+        completion = await provider.complete(model=model, system=version.body, user=req.input)
+        set_attributes(
+            s,
+            **{
+                "llm.prompt_tokens": completion.prompt_tokens,
+                "llm.completion_tokens": completion.completion_tokens,
+            },
+        )
     latency_ms = int((time.perf_counter() - start) * 1000)
 
     await repo.record_telemetry(

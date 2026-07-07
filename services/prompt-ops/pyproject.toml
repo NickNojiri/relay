@@ -23,6 +23,12 @@ dev = [
 native = [
     "relay-flag-py",
 ]
+# Distributed tracing (opt-in with RELAY_OTEL_ENABLED); `uv sync --group otel`
+otel = [
+    "opentelemetry-sdk>=1.27",
+    "opentelemetry-exporter-otlp-proto-http>=1.27",
+    "opentelemetry-instrumentation-fastapi>=0.48b0",
+]
 
 [tool.uv]
 package = false
