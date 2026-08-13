@@ -79,3 +79,35 @@ jobs:
           --config services/sync-server/fly.toml
           --dockerfile services/sync-server/Dockerfile
           .
+
+  # Post-deploy check. Runners can reach *.fly.dev, so this both proves the
+  # gateway serves traffic and surfaces startup crashes (a bad DATABASE_URL, say)
+  # that a successful `flyctl deploy` would not reveal.
+  verify:
+    needs: [prompt-ops, sync-server]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # The gateway runs with min_machines_running = 0, so the first request pays
+      # the cold start. A slow first hit then a fast second one is healthy; two
+      # failures mean the app itself is unhealthy.
+      - name: Probe /health (cold, then warm)
+        run: |
+          for attempt in 1 2; do
+            echo "--- attempt $attempt ---"
+            curl -sS -m 90 -o /tmp/body \
+              -w 'http=%{http_code} total=%{time_total}s\n' \
+              https://relay-prompt-ops.fly.dev/health || echo "curl exit $?"
+            head -c 500 /tmp/body; echo
+          done
+      - name: Gateway status and logs
+        if: always()
+        run: |
+          flyctl status --app relay-prompt-ops
+          flyctl logs --app relay-prompt-ops --no-tail
+      - name: Sync server status and logs
+        if: always()
+        run: |
+          flyctl status --app relay-sync-nojiri
+          flyctl logs --app relay-sync-nojiri --no-tail
