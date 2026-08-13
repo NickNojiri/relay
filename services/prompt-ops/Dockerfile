@@ -16,4 +16,10 @@ COPY scripts ./scripts
 ENV PROMPT_OPS_PORT=8000
 EXPOSE 8000
 
-CMD ["uv", "run", "--no-dev", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run uvicorn straight from the synced venv rather than via `uv run`. `uv run`
+# re-reads pyproject.toml at startup, including the `native` group's source
+# `../../packages/flag-py` — a path outside this build context, and above / once
+# WORKDIR is /app. Newer uv rejects that ("cannot normalize a relative path
+# beyond the base directory") and the container exits before binding the port.
+ENV PATH="/app/.venv/bin:$PATH"
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
