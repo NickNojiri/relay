@@ -38,6 +38,9 @@ jobs:
       # Fail loudly instead of shipping that.
       - name: Require the gateway API key
         run: |
+          # Names only — GitHub masks every value in the log, so nothing leaks.
+          echo "Secrets visible to this workflow:"
+          echo '${{ toJSON(secrets) }}' | jq -r 'keys[]' | sed 's/^/  - /'
           if [ -z "${{ secrets.RELAY_API_KEYS }}" ]; then
             echo "::error::RELAY_API_KEYS repo secret is empty or missing."
             echo "Without it the gateway accepts unauthenticated /v1 requests."
