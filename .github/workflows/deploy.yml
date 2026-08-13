@@ -21,6 +21,9 @@ on:
 
 env:
   FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+  # Fly org slug that owns the apps. Override with the FLY_ORG repo variable
+  # (Settings -> Secrets and variables -> Actions -> Variables) if yours differs.
+  FLY_ORG: ${{ vars.FLY_ORG || 'personal' }}
 
 jobs:
   prompt-ops:
@@ -28,8 +31,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Show what this token can see
+        run: flyctl orgs list
       - name: Ensure app exists
-        run: flyctl apps create relay-prompt-ops --org irg || echo "app already exists"
+        run: flyctl apps create relay-prompt-ops --org "$FLY_ORG" || flyctl apps list
       - name: Stage secrets
         run: >
           flyctl secrets set --app relay-prompt-ops --stage
@@ -52,8 +57,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Show what this token can see
+        run: flyctl orgs list
       - name: Ensure app exists
-        run: flyctl apps create relay-sync --org irg || echo "app already exists"
+        run: flyctl apps create relay-sync --org "$FLY_ORG" || flyctl apps list
       - name: Deploy
         run: >
           flyctl deploy --remote-only
