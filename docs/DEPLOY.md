@@ -47,7 +47,7 @@ The Dockerfile expects the **repo root** as build context:
 flyctl deploy --config services/sync-server/fly.toml \
   --dockerfile services/sync-server/Dockerfile .
 ```
-→ `wss://relay-sync.fly.dev`.
+→ `wss://relay-sync-nojiri.fly.dev`.
 
 ## 4. Studio → Vercel (`apps/studio`)
 Import the repo in Vercel (root directory `apps/studio`; `vercel.json` sets the build/install
@@ -57,7 +57,7 @@ commands). Set **Production** environment variables:
 |-----|-------|
 | `PROMPT_OPS_URL` | `https://relay-prompt-ops.fly.dev` |
 | `PROMPT_OPS_API_KEY` | the key from `RELAY_API_KEYS` (the proxy authenticates server-side) |
-| `NEXT_PUBLIC_SYNC_URL` | `wss://relay-sync.fly.dev` |
+| `NEXT_PUBLIC_SYNC_URL` | `wss://relay-sync-nojiri.fly.dev` |
 | `DATABASE_URL` | `<neon-url>` (for the editor/flags/telemetry Server Actions) |
 
 Then `vercel --prod`, or just push to `main` (the Vercel GitHub app auto-deploys).

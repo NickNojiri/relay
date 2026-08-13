@@ -1,5 +1,6 @@
 # fly deploy --config services/sync-server/fly.toml
-app = "relay-sync"
+# NB: Fly app names are globally unique — plain "relay-sync" is taken by another account.
+app = "relay-sync-nojiri"
 primary_region = "sjc"
 
 [build]
