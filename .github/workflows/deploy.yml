@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Ensure app exists
-        run: flyctl apps create relay-prompt-ops --org personal || echo "app already exists"
+        run: flyctl apps create relay-prompt-ops --org irg || echo "app already exists"
       - name: Stage secrets
         run: >
           flyctl secrets set --app relay-prompt-ops --stage
@@ -53,7 +53,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Ensure app exists
-        run: flyctl apps create relay-sync --org personal || echo "app already exists"
+        run: flyctl apps create relay-sync --org irg || echo "app already exists"
       - name: Deploy
         run: >
           flyctl deploy --remote-only
