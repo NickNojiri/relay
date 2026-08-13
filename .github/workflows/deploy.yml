@@ -33,6 +33,18 @@ jobs:
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Show what this token can see
         run: flyctl orgs list
+      # An empty RELAY_API_KEYS disables auth entirely (see app/security.py), which
+      # would leave the public gateway — and the Anthropic key behind it — wide open.
+      # Fail loudly instead of shipping that.
+      - name: Require the gateway API key
+        run: |
+          if [ -z "${{ secrets.RELAY_API_KEYS }}" ]; then
+            echo "::error::RELAY_API_KEYS repo secret is empty or missing."
+            echo "Without it the gateway accepts unauthenticated /v1 requests."
+            echo "Add it under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+          echo "RELAY_API_KEYS is set."
       - name: Ensure app exists
         run: flyctl apps create relay-prompt-ops --org "$FLY_ORG" || flyctl apps list
       - name: Stage secrets
