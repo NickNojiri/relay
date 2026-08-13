@@ -1,0 +1,47 @@
+name: Diagnose Fly services
+
+# Manual troubleshooting helper: probes the public health endpoint from a runner
+# (which, unlike a dev sandbox behind an egress proxy, can reach *.fly.dev) and
+# dumps machine status plus recent app logs.
+#
+# Run it from the Actions tab -> "Diagnose Fly services" -> "Run workflow".
+on:
+  workflow_dispatch:
+
+env:
+  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # First request wakes the machine (min_machines_running = 0), so time both:
+      # a slow first hit then a fast second one is a healthy cold start, while two
+      # failures point at the app itself.
+      - name: Probe /health (cold, then warm)
+        run: |
+          for attempt in 1 2; do
+            echo "--- attempt $attempt ---"
+            curl -sS -m 90 -o /tmp/body.$attempt \
+              -w 'http=%{http_code} total=%{time_total}s\n' \
+              https://relay-prompt-ops.fly.dev/health || echo "curl failed: $?"
+            head -c 500 /tmp/body.$attempt; echo
+          done
+
+      - name: Gateway machine status
+        if: always()
+        run: flyctl status --app relay-prompt-ops
+
+      - name: Gateway logs
+        if: always()
+        run: flyctl logs --app relay-prompt-ops --no-tail
+
+      - name: Sync server machine status
+        if: always()
+        run: flyctl status --app relay-sync-nojiri
+
+      - name: Sync server logs
+        if: always()
+        run: flyctl logs --app relay-sync-nojiri --no-tail
