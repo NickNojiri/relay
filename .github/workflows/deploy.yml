@@ -38,9 +38,15 @@ jobs:
       # Fail loudly instead of shipping that.
       - name: Require the gateway API key
         run: |
-          # Names only — GitHub masks every value in the log, so nothing leaks.
-          echo "Secrets visible to this workflow:"
-          echo '${{ toJSON(secrets) }}' | jq -r 'keys[]' | sed 's/^/  - /'
+          # Presence only (never the values): tells a misnamed secret apart from
+          # a missing one. DATABASE_URL/ANTHROPIC_API_KEY are known-good controls.
+          set_or_not() { [ -n "$1" ] && echo "set" || echo "MISSING"; }
+          echo "DATABASE_URL        $(set_or_not '${{ secrets.DATABASE_URL }}')"
+          echo "ANTHROPIC_API_KEY   $(set_or_not '${{ secrets.ANTHROPIC_API_KEY }}')"
+          echo "RELAY_API_KEYS      $(set_or_not '${{ secrets.RELAY_API_KEYS }}')"
+          echo "RELAY_API_KEY       $(set_or_not '${{ secrets.RELAY_API_KEY }}')"
+          echo "RELAY_KEYS          $(set_or_not '${{ secrets.RELAY_KEYS }}')"
+          echo "PROMPT_OPS_API_KEY  $(set_or_not '${{ secrets.PROMPT_OPS_API_KEY }}')"
           if [ -z "${{ secrets.RELAY_API_KEYS }}" ]; then
             echo "::error::RELAY_API_KEYS repo secret is empty or missing."
             echo "Without it the gateway accepts unauthenticated /v1 requests."
