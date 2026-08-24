@@ -50,9 +50,12 @@ def report(name: str, s: list[float]) -> dict:
         "p95": s_sorted[int(len(s) * 0.95)],
         "p99": s_sorted[int(len(s) * 0.99)],
     }
+    # Report in microseconds: a cache hit is sub-microsecond and rounds to
+    # "0.000 ms", which produces a meaningless "100% faster" claim.
     print(
-        f"  {name:<28} mean {stats['mean']:7.3f} ms | "
-        f"p50 {stats['p50']:7.3f} | p95 {stats['p95']:7.3f} | p99 {stats['p99']:7.3f}"
+        f"  {name:<28} mean {stats['mean']*1000:9.1f} us | "
+        f"p50 {stats['p50']*1000:9.1f} | p95 {stats['p95']*1000:9.1f} | "
+        f"p99 {stats['p99']*1000:9.1f}"
     )
     return stats
 
@@ -79,15 +82,21 @@ async def main() -> None:
         u = report("PostgresRepository", uncached)
         c = report("CachedRepository (5s TTL)", c_stats)
 
-        drop_mean = (1 - c["mean"] / u["mean"]) * 100
-        drop_p95 = (1 - c["p95"] / u["p95"]) * 100
+        speedup = u["mean"] / c["mean"] if c["mean"] else float("inf")
         print(
-            f"\n  => cache cuts mean flag-lookup latency {drop_mean:.1f}% "
-            f"({u['mean']:.3f} ms -> {c['mean']:.3f} ms); p95 {drop_p95:.1f}%"
+            f"\n  => cache hit is {speedup:,.0f}x faster than the Postgres read "
+            f"({u['mean']*1000:.0f} us -> {c['mean']*1000:.1f} us mean, n={N})"
         )
         print(
-            f"  => resume line: \"cut flag-lookup latency {drop_mean:.0f}% "
-            f"({u['mean']:.2f} ms -> {c['mean']:.2f} ms p50-mean over {N} calls)\"\n"
+            f"  => resume line: \"kept flag lookups off the database on the hot "
+            f"path with a TTL cache, cutting a {u['mean']*1000:.0f} us Postgres "
+            f"read to {c['mean']*1000:.1f} us ({speedup:,.0f}x) over {N} calls\""
+        )
+        print(
+            "\n  NOTE: measured against Postgres over a local socket - the "
+            "cheapest possible\n  read. Against a network-hosted database "
+            "(Neon) the uncached arm is far\n  slower, so this delta is "
+            "conservative.\n"
         )
     finally:
         await pool.close()
