@@ -1,73 +1,36 @@
-.PHONY: demo demo-up demo-down demo-logs demo-clean demo-reset
+COMPOSE := docker compose -f infra/demo/compose.yml
+OLLAMA_MODEL ?= llama3.2:1b
 
-# Build and start the full stack locally with Docker Compose
+.PHONY: demo demo-ollama demo-logs demo-down demo-reset
+
+## Full stack locally with the Echo provider: no API keys, no cloud spend.
 demo:
-	@echo "🚀 Starting Relay stack (postgres + ollama + gateway + sync-server + studio)..."
-	@echo "   Studio:      http://localhost:3000"
-	@echo "   Gateway:     http://localhost:8000"
-	@echo "   Sync server: ws://localhost:3001"
-	@echo ""
-	@echo "   Demo API key: demo-key-12345"
-	@echo "   Database: postgresql://relay:relay@localhost:5432/relay"
-	@echo ""
-	@echo "   (Run 'make demo-logs' in another terminal to follow startup)"
-	docker-compose up -d
-	@echo ""
-	@echo "Waiting for services to be ready..."
-	@sleep 10
-	@curl -s http://localhost:8000/health | jq . || echo "Gateway not yet ready, checking again..."
-	@sleep 5
-	@echo ""
-	@echo "✅ Stack is up! Open http://localhost:3000 in your browser."
-	@echo ""
-	@echo "   Next steps:"
-	@echo "   1. Create a prompt in /editor"
-	@echo "   2. Create a flag in /flags"
-	@echo "   3. Test in /playground"
-	@echo ""
-	@echo "   Stop with: make demo-down"
+	$(COMPOSE) up -d --build --wait
+	@$(MAKE) --no-print-directory _urls
 
-# Show live logs from all services
+## Same stack, but the gateway calls a real local model through Ollama.
+## First run downloads the Ollama image and the model (~1.3 GB for llama3.2:1b).
+demo-ollama:
+	DEMO_PROVIDER=ollama DEMO_MODEL=$(OLLAMA_MODEL) $(COMPOSE) --profile ollama up -d --build --wait
+	$(COMPOSE) exec ollama ollama pull $(OLLAMA_MODEL)
+	@$(MAKE) --no-print-directory _urls
+
 demo-logs:
-	docker-compose logs -f
+	$(COMPOSE) --profile ollama logs -f
 
-# Stop all services (keep volumes/data)
+## Stop containers; demo data is kept.
 demo-down:
-	docker-compose down
-	@echo "✅ Stopped (data preserved)"
+	$(COMPOSE) --profile ollama down
 
-# Stop and remove everything (fresh start next time)
-demo-clean:
-	docker-compose down -v
-	@echo "✅ Cleaned (volumes removed)"
+## Stop and wipe demo data; the next `make demo` re-seeds.
+demo-reset:
+	$(COMPOSE) --profile ollama down -v
 
-# Restart a service (e.g., make demo-restart SERVICE=gateway)
-demo-restart:
-	docker-compose restart $(SERVICE)
-
-# Show status of all services
-demo-status:
-	docker-compose ps
-
-# Open studio in browser (macOS)
-demo-open:
-	open http://localhost:3000
-
-.PHONY: build lint test typecheck
-
-# Development targets (use pnpm directly)
-build:
-	turbo run build
-
-lint:
-	turbo run lint
-
-test:
-	turbo run test
-
-typecheck:
-	turbo run typecheck
-
-clean:
-	turbo run clean
-	docker-compose down -v 2>/dev/null || true
+.PHONY: _urls
+_urls:
+	@echo ""
+	@echo "Relay demo is up."
+	@echo "  Studio       http://localhost:3000   (start at /playground)"
+	@echo "  Gateway      http://localhost:8000   (API key: demo-key)"
+	@echo "  Sync server  ws://localhost:1234"
+	@echo "Stop with 'make demo-down'; wipe data with 'make demo-reset'."

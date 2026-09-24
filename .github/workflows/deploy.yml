@@ -10,14 +10,9 @@ name: Deploy services
 #   RELAY_API_KEYS     - gateway API key(s), comma-separated; the studio's PROMPT_OPS_API_KEY
 #                        must be one of them. The singular RELAY_API_KEY is accepted too.
 #
-# Trigger manually from the Actions tab ("Run workflow"), or automatically on push to main.
+# Manual only (Actions tab -> "Run workflow"): production is torn down between demos, and a
+# push-triggered deploy would recreate the paid Fly apps. See docs/DEPLOY.md.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "services/**"
-      - "packages/**"
-      - ".github/workflows/deploy.yml"
   workflow_dispatch:
 
 env:

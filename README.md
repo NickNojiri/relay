@@ -156,7 +156,12 @@ flag decision itself is an in-process FNV-1a hash with **no database round-trip*
 
 ## Run it on your own computer
 
-You need [Node](https://nodejs.org) and [Docker](https://www.docker.com/products/docker-desktop/);
+**Fastest:** with only [Docker](https://www.docker.com/products/docker-desktop/) installed, run
+`make demo` (Windows: `.\scripts\demo.ps1`). It starts the whole stack with a seeded prompt and
+A/B flag at http://localhost:3000. It needs no API keys and has no cloud cost; see
+[docs/DEPLOY.md](docs/DEPLOY.md#local-demo).
+
+**For development**, you need [Node](https://nodejs.org) and [Docker](https://www.docker.com/products/docker-desktop/);
 optionally [uv](https://docs.astral.sh/uv/) (Python) and [Ollama](https://ollama.com) for the AI.
 
 ```bash
@@ -178,10 +183,10 @@ to `uv` and set `NODE_OPTIONS=--use-system-ca` before pnpm.)*
 
 ## Putting it online (optional)
 
-Everything is configured for free hosting tiers; **[docs/DEPLOY.md](docs/DEPLOY.md)** is a
-copy-paste runbook. Short version: **Neon** hosts the database, **Upstash** hosts Redis, **Fly.io**
-runs the gateway + collaboration server, and **Vercel** runs the website. The final `deploy`
-commands are the only steps that need your own (free) accounts.
+Relay has run in production: **Neon** hosted the database, **Fly.io** ran the gateway and
+collaboration server, and **Vercel** ran the website, all deployed from GitHub Actions. It has
+since been taken down to avoid hosting cost. **[docs/DEPLOY.md](docs/DEPLOY.md)** has the exact
+steps to bring it back.
 
 ---
 

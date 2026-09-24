@@ -1,0 +1,89 @@
+# Full Relay stack on one machine, no cloud accounts: `make demo` (or scripts/demo.ps1).
+# Echo provider by default; `make demo-ollama` switches the gateway to a local Ollama model.
+name: relay-demo
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: relay
+      POSTGRES_PASSWORD: relay
+      POSTGRES_DB: relay
+    volumes:
+      - pg:/var/lib/postgresql/data
+      # Runs once, on an empty volume: schema, then demo prompt + A/B flag.
+      - ../../packages/db/drizzle/0000_right_domino.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U relay -d relay"]
+      interval: 2s
+      retries: 30
+
+  gateway:
+    build:
+      context: ../../services/prompt-ops
+    environment:
+      DATABASE_URL: postgres://relay:relay@postgres:5432/relay
+      RELAY_DB_ENABLED: "true"
+      RELAY_DEFAULT_PROVIDER: ${DEMO_PROVIDER:-echo}
+      RELAY_DEFAULT_MODEL: ${DEMO_MODEL:-echo}
+      OLLAMA_BASE_URL: http://ollama:11434
+      RELAY_API_KEYS: demo-key
+      RELAY_RATE_LIMIT_PER_MINUTE: "120"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 3s
+      retries: 20
+
+  sync-server:
+    build:
+      context: ../..
+      dockerfile: services/sync-server/Dockerfile
+    ports:
+      - "1234:1234"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('net').connect(1234).on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 3s
+      retries: 20
+
+  studio:
+    build:
+      context: ../..
+      dockerfile: apps/studio/Dockerfile
+    environment:
+      DATABASE_URL: postgres://relay:relay@postgres:5432/relay
+      PROMPT_OPS_URL: http://gateway:8000
+      PROMPT_OPS_API_KEY: demo-key
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+      sync-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 3s
+      retries: 30
+
+  # Only started with `--profile ollama` (make demo-ollama); the image is several GB.
+  ollama:
+    image: ollama/ollama:latest
+    profiles: [ollama]
+    volumes:
+      - ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 3s
+      retries: 20
+
+volumes:
+  pg:
+  ollama:
