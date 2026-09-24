@@ -1,6 +1,15 @@
-# Deploying Relay (Phase 6)
+# Deploying Relay
 
-Production topology:
+## Status: Deployment Paused
+
+Relay was successfully deployed to production (Vercel, Fly.io, Neon) and verified working end-to-end.
+The live deployment has been taken down to avoid ongoing hosting costs. This guide provides exact
+redeploy steps (all secrets as placeholders) for when you're ready to ship.
+
+For demos and development, use the **local docker-compose setup** (see below) with Echo and Ollama —
+no cloud spend, instant startup, perfect for screen-recording.
+
+## Production topology (when redeployed)
 
 | Component | Host | Notes |
 |-----------|------|-------|
@@ -14,63 +23,120 @@ Everything is already env-driven (localhost fallbacks for dev), so deploying is 
 not code changes. The configs are committed: `apps/studio/vercel.json`,
 `services/*/fly.toml`, `services/*/Dockerfile`, `.dockerignore`.
 
-## 0. Prerequisites
-Accounts: Vercel, Fly.io, Neon, Upstash. CLIs: `vercel`, `flyctl`, `gh`.
+---
 
-## 1. Provision data
-- **Neon** → create a project → copy `DATABASE_URL`.
-- **Upstash** → create a Redis database → copy the `rediss://` `REDIS_URL`.
-- Apply the schema:
+## Demo Locally (Fast, Zero Cost)
+
+Use docker-compose to bring up the full stack with Echo and Ollama (instant startup, perfect for
+screen-recording and testing). No cloud accounts, no secrets needed.
+
+```bash
+make demo
+```
+
+This starts:
+- **Studio** → http://localhost:3000
+- **Gateway** → http://localhost:8000 (Echo provider, instant responses)
+- **Sync server** → ws://localhost:3001
+- **Postgres** (in container)
+- **Ollama** (optional; for local LLM experimentation)
+
+The demo uses in-process flag cache and rate limiter — no Redis needed. Create a prompt in `/editor`,
+set flags in `/flags`, and run in `/playground` — all writes go to the containerized Postgres.
+
+See `docker-compose.yml` and `.env.example` for config options.
+
+---
+
+## Redeploy to Production
+
+When you're ready to ship live again, follow these exact steps. All secrets shown as placeholders —
+fill in with your real values. Never commit secrets to the repo.
+
+### 0. Prerequisites
+- Accounts: **Vercel**, **Fly.io**, **Neon**, **Upstash**
+- CLIs installed: `vercel`, `flyctl`
+- Generate a strong API key for the gateway:
   ```bash
-  DATABASE_URL="<neon-url>" corepack pnpm --filter @relay/db db:migrate
+  openssl rand -hex 32
   ```
 
-## 2. Gateway → Fly (`services/prompt-ops`)
+### 1. Provision data
+- **Neon** → create a project → copy `DATABASE_URL` (format: `postgresql://...?sslmode=require`)
+- **Upstash** → create a Redis database → copy the `rediss://...` `REDIS_URL`
+- Apply the schema:
+  ```bash
+  DATABASE_URL="postgresql://user:pass@host/db?sslmode=require" \
+  corepack pnpm --filter @relay/db db:migrate
+  ```
+
+### 2. Deploy gateway to Fly (`services/prompt-ops`)
 ```bash
-cd services/prompt-ops
-flyctl launch --no-deploy --copy-config --name relay-prompt-ops   # first time only
-flyctl secrets set \
-  DATABASE_URL="<neon-url>" \
-  REDIS_URL="<upstash-url>" \
-  ANTHROPIC_API_KEY="<key>" \
+# First time only: create the app
+flyctl launch --no-deploy --copy-config --name relay-prompt-ops
+
+# Set secrets (use your real values)
+flyctl secrets set --app relay-prompt-ops \
+  DATABASE_URL="postgresql://user:pass@host/db?sslmode=require" \
+  REDIS_URL="rediss://default:password@host:port" \
+  ANTHROPIC_API_KEY="sk-ant-..." \
   RELAY_DB_ENABLED=true \
   RELAY_DEFAULT_PROVIDER=anthropic \
-  RELAY_API_KEYS="<generate-a-long-random-key>" \
+  RELAY_DEFAULT_MODEL=claude-3-5-haiku-latest \
+  RELAY_API_KEYS="your-generated-key-here" \
   RELAY_RATE_LIMIT_PER_MINUTE=60
-flyctl deploy
-```
-→ `https://relay-prompt-ops.fly.dev` (health: `GET /health`).
 
-## 3. Sync server → Fly (`services/sync-server`)
-The Dockerfile expects the **repo root** as build context:
+# Deploy
+flyctl deploy --remote-only \
+  --config services/prompt-ops/fly.toml \
+  --dockerfile services/prompt-ops/Dockerfile services/prompt-ops
+```
+
+Health check: `curl https://relay-prompt-ops.fly.dev/health` → `{"status":"ok"}`
+
+### 3. Deploy sync server to Fly (`services/sync-server`)
 ```bash
-flyctl deploy --config services/sync-server/fly.toml \
+# First time only: create the app
+flyctl launch --no-deploy --copy-config --name relay-sync-nojiri
+
+# Deploy (no secrets needed; runs in-memory)
+flyctl deploy --remote-only \
+  --config services/sync-server/fly.toml \
   --dockerfile services/sync-server/Dockerfile .
 ```
-→ `wss://relay-sync-nojiri.fly.dev`.
 
-## 4. Studio → Vercel (`apps/studio`)
-Import the repo in Vercel (root directory `apps/studio`; `vercel.json` sets the build/install
-commands). Set **Production** environment variables:
+Result: `wss://relay-sync-nojiri.fly.dev`
 
-| Var | Value |
-|-----|-------|
+### 4. Deploy studio to Vercel (`apps/studio`)
+Import the repository in the [Vercel dashboard](https://vercel.com):
+1. Root directory: `apps/studio`
+2. Framework preset auto-detects (Next.js via `vercel.json`)
+3. Set **Production** environment variables:
+
+| Variable | Value |
+|----------|-------|
 | `PROMPT_OPS_URL` | `https://relay-prompt-ops.fly.dev` |
-| `PROMPT_OPS_API_KEY` | the key from `RELAY_API_KEYS` (the proxy authenticates server-side) |
+| `PROMPT_OPS_API_KEY` | (same as `RELAY_API_KEYS` above) |
 | `NEXT_PUBLIC_SYNC_URL` | `wss://relay-sync-nojiri.fly.dev` |
-| `DATABASE_URL` | `<neon-url>` (for the editor/flags/telemetry Server Actions) |
+| `DATABASE_URL` | (same Neon URL from step 1) |
 
-Then `vercel --prod`, or just push to `main` (the Vercel GitHub app auto-deploys).
+4. Deploy: either push to `main` (auto-deploy via Vercel GitHub app) or `vercel --prod`
 
-## 5. Smoke-test the live deployment
-- `/playground` → **Run** → tokens stream from the Fly gateway.
-- `/editor` → the collaborative draft syncs through the Fly sync-server (open two tabs).
-- `/editor` + `/flags` write to Neon; `/telemetry` reads per-variant aggregates back.
+### 5. Smoke-test
+- **`/playground`** → send a message → tokens stream from the live gateway
+- **`/editor`** → open in two browser tabs → edits sync in real-time via the sync-server
+- **`/flags`** → create a flag (writes to Neon)
+- **`/telemetry`** → after a few playground runs, see per-variant token/latency aggregates
 
-## CI/CD
-`.github/workflows/deploy.yml` deploys the two Fly services on push to `main`
-(needs the `FLY_API_TOKEN` repo secret). Studio is deployed by Vercel's own GitHub integration.
+### 6. CI/CD (optional)
+`.github/workflows/deploy.yml` auto-deploys both Fly services on push to `main`. To enable:
+1. Generate a deploy token: `flyctl tokens create deploy`
+2. Add to GitHub → Settings → Secrets → `FLY_API_TOKEN`
+3. Studio redeploys via Vercel's own GitHub integration (no manual secret needed)
 
-## Env reference
-See `.env.example` for the full list. Secrets live in Fly (`flyctl secrets`) and Vercel
-(Project → Settings → Environment Variables) — never in the repo.
+---
+
+## Environment reference
+See `.env.example` for the complete list of tunable environment variables. Production secrets
+live in Fly (`flyctl secrets`) and Vercel (Project → Settings → Environment Variables) — never
+commit them to the repo.
