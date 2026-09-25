@@ -191,7 +191,8 @@ def manifest(config: dict, gateway_url: str, launched: bool) -> dict:
     return {
         "started_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "git_sha": _git("rev-parse", "HEAD"),
-        "git_dirty": bool(_git("status", "--porcelain")),
+        # Earlier runs' output doesn't change what is measured, so it doesn't count as dirty.
+        "git_dirty": bool(_git("status", "--porcelain", "--", ":/", ":(exclude)loadtest/results")),
         "gateway_url": gateway_url,
         "gateway_launched_by_bench": launched,
         "client_and_gateway_same_host": launched,
