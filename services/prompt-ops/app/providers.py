@@ -16,8 +16,45 @@ class Completion:
     completion_tokens: int
 
 
+async def _sse_data(resp: httpx.Response):
+    """The JSON payload of each `data:` line in a server-sent-events response."""
+    async for line in resp.aiter_lines():
+        if not line.startswith("data:"):
+            continue
+        data = line[len("data:"):].strip()
+        if not data or data == "[DONE]":
+            continue
+        try:
+            yield json.loads(data)
+        except json.JSONDecodeError:
+            continue
+
+
 class LLMProvider(Protocol):
     async def complete(self, *, model: str, system: str, user: str) -> Completion: ...
+
+
+class _HTTPProvider:
+    """One pooled httpx client per provider, reused across requests.
+
+    Building an AsyncClient loads the CA bundle into a fresh TLS context, about
+    60 ms of CPU. Doing that per request capped a single worker near 16 req/s
+    (loadtest/results/README.md); reusing one client also keeps connections alive.
+    """
+
+    def __init__(self, transport: httpx.AsyncBaseTransport | None = None) -> None:
+        self._transport = transport
+        self._client: httpx.AsyncClient | None = None
+
+    @property
+    def client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=120, transport=self._transport)
+        return self._client
+
+    async def aclose(self) -> None:
+        if self._client is not None:
+            await self._client.aclose()
 
 
 class EchoProvider:
@@ -36,10 +73,10 @@ class EchoProvider:
             yield token + " "
 
 
-class OllamaProvider:
+class OllamaProvider(_HTTPProvider):
     def __init__(self, base_url: str, transport: httpx.AsyncBaseTransport | None = None) -> None:
+        super().__init__(transport)
         self._base_url = base_url.rstrip("/")
-        self._transport = transport
 
     async def complete(self, *, model: str, system: str, user: str) -> Completion:
         payload = {
@@ -50,10 +87,10 @@ class OllamaProvider:
                 {"role": "user", "content": user},
             ],
         }
-        async with httpx.AsyncClient(timeout=120, transport=self._transport) as client:
-            resp = await client.post(f"{self._base_url}/api/chat", json=payload)
-            resp.raise_for_status()
-            data = resp.json()
+        client = self.client
+        resp = await client.post(f"{self._base_url}/api/chat", json=payload)
+        resp.raise_for_status()
+        data = resp.json()
         return Completion(
             text=data.get("message", {}).get("content", ""),
             prompt_tokens=int(data.get("prompt_eval_count", 0)),
@@ -76,31 +113,31 @@ class OllamaProvider:
                 {"role": "user", "content": user},
             ],
         }
-        async with httpx.AsyncClient(timeout=120, transport=self._transport) as client:
-            async with client.stream(
-                "POST", f"{self._base_url}/api/chat", json=payload
-            ) as resp:
-                resp.raise_for_status()
-                async for line in resp.aiter_lines():
-                    if not line.strip():
-                        continue
-                    try:
-                        data = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    chunk = data.get("message", {}).get("content", "")
-                    if chunk:
-                        yield chunk
-                    if data.get("done"):
-                        break
+        client = self.client
+        async with client.stream(
+            "POST", f"{self._base_url}/api/chat", json=payload
+        ) as resp:
+            resp.raise_for_status()
+            async for line in resp.aiter_lines():
+                if not line.strip():
+                    continue
+                try:
+                    data = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                chunk = data.get("message", {}).get("content", "")
+                if chunk:
+                    yield chunk
+                if data.get("done"):
+                    break
 
 
-class AnthropicProvider:
+class AnthropicProvider(_HTTPProvider):
     """Anthropic Messages API (https://api.anthropic.com/v1/messages)."""
 
     def __init__(self, api_key: str, transport: httpx.AsyncBaseTransport | None = None) -> None:
+        super().__init__(transport)
         self._api_key = api_key
-        self._transport = transport
 
     async def complete(self, *, model: str, system: str, user: str) -> Completion:
         payload = {
@@ -114,10 +151,10 @@ class AnthropicProvider:
             "anthropic-version": "2023-06-01",
             "content-type": "application/json",
         }
-        async with httpx.AsyncClient(timeout=120, transport=self._transport) as client:
-            resp = await client.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
+        client = self.client
+        resp = await client.post("https://api.anthropic.com/v1/messages", headers=headers, json=payload)
+        resp.raise_for_status()
+        data = resp.json()
         text = "".join(
             block.get("text", "") for block in data.get("content", []) if block.get("type") == "text"
         )
@@ -128,13 +165,48 @@ class AnthropicProvider:
             completion_tokens=int(usage.get("output_tokens", 0)),
         )
 
+    async def stream(self, *, model: str, system: str, user: str):
+        """Text deltas from the Messages API's SSE stream (`content_block_delta` events)."""
+        payload = {
+            "model": model,
+            "max_tokens": 1024,
+            "system": system,
+            "messages": [{"role": "user", "content": user}],
+            "stream": True,
+        }
+        headers = {
+            "x-api-key": self._api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        }
+        client = self.client
+        async with client.stream(
+            "POST", "https://api.anthropic.com/v1/messages", headers=headers, json=payload
+        ) as resp:
+            resp.raise_for_status()
+            async for event in _sse_data(resp):
+                kind = event.get("type")
+                if kind == "content_block_delta":
+                    delta = event.get("delta", {})
+                    if delta.get("type") == "text_delta" and delta.get("text"):
+                        yield delta["text"]
+                elif kind == "error":
+                    # An overload reported inside an open stream: surface it
+                    # like the HTTP 529 it stands for.
+                    raise httpx.HTTPStatusError(
+                        "stream error", request=resp.request,
+                        response=httpx.Response(529, request=resp.request),
+                    )
+                elif kind == "message_stop":
+                    break
 
-class OpenAIProvider:
+
+class OpenAIProvider(_HTTPProvider):
     """OpenAI Chat Completions API."""
 
     def __init__(self, api_key: str, transport: httpx.AsyncBaseTransport | None = None) -> None:
+        super().__init__(transport)
         self._api_key = api_key
-        self._transport = transport
 
     async def complete(self, *, model: str, system: str, user: str) -> Completion:
         payload = {
@@ -145,12 +217,12 @@ class OpenAIProvider:
             ],
         }
         headers = {"authorization": f"Bearer {self._api_key}"}
-        async with httpx.AsyncClient(timeout=120, transport=self._transport) as client:
-            resp = await client.post(
-                "https://api.openai.com/v1/chat/completions", headers=headers, json=payload
-            )
-            resp.raise_for_status()
-            data = resp.json()
+        client = self.client
+        resp = await client.post(
+            "https://api.openai.com/v1/chat/completions", headers=headers, json=payload
+        )
+        resp.raise_for_status()
+        data = resp.json()
         choices = data.get("choices") or [{}]
         text = choices[0].get("message", {}).get("content", "")
         usage = data.get("usage", {})
@@ -159,6 +231,28 @@ class OpenAIProvider:
             prompt_tokens=int(usage.get("prompt_tokens", 0)),
             completion_tokens=int(usage.get("completion_tokens", 0)),
         )
+
+    async def stream(self, *, model: str, system: str, user: str):
+        """Content deltas from Chat Completions' SSE stream (ends with `data: [DONE]`)."""
+        payload = {
+            "model": model,
+            "stream": True,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+        }
+        headers = {"authorization": f"Bearer {self._api_key}"}
+        client = self.client
+        async with client.stream(
+            "POST", "https://api.openai.com/v1/chat/completions", headers=headers, json=payload
+        ) as resp:
+            resp.raise_for_status()
+            async for event in _sse_data(resp):
+                for choice in event.get("choices") or []:
+                    chunk = (choice.get("delta") or {}).get("content")
+                    if chunk:
+                        yield chunk
 
 
 def build_provider(settings: Settings) -> LLMProvider:

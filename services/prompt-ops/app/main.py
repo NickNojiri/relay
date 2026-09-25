@@ -16,6 +16,7 @@ from .routing import (
     Attempt,
     MidStreamFailure,
     ProviderRouter,
+    close_router,
     get_router,
 )
 from .repository import (
@@ -40,6 +41,7 @@ async def lifespan(app: FastAPI):
         pool = await asyncpg.create_pool(dsn=settings.database_url)
         set_pool(pool)
     yield
+    await close_router()
     if pool is not None:
         await pool.close()
 

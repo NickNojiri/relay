@@ -178,6 +178,13 @@ class ProviderRouter:
             self._providers[name] = self._factory(name)
         return self._providers[name]
 
+    async def aclose(self) -> None:
+        """Close every provider's pooled HTTP client (called at shutdown)."""
+        for provider in self._providers.values():
+            close = getattr(provider, "aclose", None)
+            if close is not None:
+                await close()
+
     def plan(self, preferred: str, model: str) -> list[tuple[str, str]]:
         """Preferred provider first, then the fallback chain, each provider once."""
         out = [(preferred, model)]
@@ -297,3 +304,11 @@ def get_router() -> ProviderRouter:
 
         _router = build_router(get_settings())
     return _router
+
+
+async def close_router() -> None:
+    """Shut down the process-wide router's HTTP clients, if one was built."""
+    global _router
+    if _router is not None:
+        await _router.aclose()
+        _router = None
