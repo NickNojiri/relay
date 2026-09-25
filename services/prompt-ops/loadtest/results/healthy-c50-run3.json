@@ -1,0 +1,15 @@
+{
+  "concurrency": 50,
+  "duration_s": 20.12,
+  "requests": 4903,
+  "ok": 4903,
+  "errors": 0,
+  "error_rate": 0.0,
+  "throughput_rps": 243.7,
+  "latency_ms": {
+    "p50": 132.57,
+    "p95": 642.15,
+    "p99": 1022.15,
+    "max": 2052.2
+  }
+}

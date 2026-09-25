@@ -7,7 +7,7 @@
 ![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white)
 ![WebAssembly](https://img.shields.io/badge/WebAssembly-654FF0?logo=webassembly&logoColor=white)
 
-_Rust flag engine · Next.js studio · FastAPI gateway · native napi/Wasm/PyO3 bindings · Yjs live collaboration · 0 audit vulns · ~620 req/s routing @ 9.6 ms p50._
+_Rust flag engine · Next.js studio · FastAPI gateway · native napi/Wasm/PyO3 bindings · Yjs live collaboration · 0 audit vulns · 346 req/s @ 27.6 ms p50 through a real provider hop (local, 1 worker) · provider failover with circuit breakers._
 
 **An end-to-end prompt-deployment platform.** Author an AI system prompt, ship it through a
 gateway, A/B-test it with feature flags, and track cost & latency per version — so you can tell
@@ -119,39 +119,43 @@ relay/
 | 6 | Deploy: configs + runbook + CI/CD — see **[docs/DEPLOY.md](docs/DEPLOY.md)** | ✅ ready |
 | 4b | Native Rust bindings (napi-rs / Wasm / PyO3) + cross-binding conformance | ✅ |
 | 10 | Hardening: API-key auth · rate limiting · OpenTelemetry tracing · perf-benchmarked | ✅ |
-| 11 | Provider failover: per-provider timeouts · circuit breakers · `/health/providers` | ✅ |
+| 11 | Provider failover (timeouts · circuit breakers · `/health/providers`) · streaming on all providers · graceful shutdown · re-benchmarked | ✅ |
 | 7–8 | Live deploy + production numbers (needs hosting accounts) | ⏳ next |
 
 **What's next:** ship it live and measure it — the prioritized plan lives in
 **[docs/ROADMAP.md](docs/ROADMAP.md)**.
 
 **Security:** `pnpm audit` → **0 known vulnerabilities**; opt-in gateway API keys + rate
-limiting. **Tests:** flag-sdk 10 (vitest, incl. native-engine conformance) · prompt-ops 46
-(pytest, incl. PyO3 conformance and provider failover) · flag-core 7 (cargo, incl. the shared fixture) · flag-wasm 2
+limiting. **Tests:** flag-sdk 10 (vitest, incl. native-engine conformance) · prompt-ops 52
+(pytest, incl. PyO3 conformance, provider failover, and a real-SIGTERM drain test) · flag-core 7 (cargo, incl. the shared fixture) · flag-wasm 2
 (node:test) · `clippy` clean · studio `next build` (9 routes).
 
 ---
 
 ## Performance
 
-Measured against a local single-worker gateway (Uvicorn) with the network-free `echo`
-provider, so the numbers isolate the **flag-eval + routing + telemetry overhead** — the work
-Relay adds on top of the LLM call — rather than model latency. Reproduce with the committed
-harness (`services/prompt-ops/loadtest/bench.py`, or `flag-eval.k6.js` if you have k6):
+Measured on one uvicorn worker on a 4-vCPU cloud dev container, with the load generator and
+an instant stub provider on the same machine. So these numbers are the gateway's own
+overhead (flag eval, routing, one real HTTP hop to the provider, telemetry), not model
+latency and not production traffic. Full setup, per-run raw JSON, and caveats:
+**[services/prompt-ops/loadtest/results/](services/prompt-ops/loadtest/results/README.md)**.
+Reproduce with `services/prompt-ops/loadtest/run_all.sh`.
 
-```
-RELAY_DEFAULT_PROVIDER=echo uv run uvicorn app.main:app --port 8000   # terminal A
-uv run python loadtest/bench.py --concurrency 10 --duration 15        # terminal B
-```
+| Scenario | Concurrency | Throughput | p50 | p95 | p99 | Errors |
+|---|---|---|---|---|---|---|
+| Healthy provider | 10 | **346 req/s** | **27.6 ms** | 38.6 ms | 47.3 ms | 0 / 20,769 |
+| Healthy provider | 50 | 225 req/s | 153 ms | 661 ms | 1,092 ms | 0 / 13,599 |
+| Primary provider down, failover | 10 | 594 req/s | 10.4 ms | 51.2 ms | 92.9 ms | 0 / 35,635 |
+| Primary provider down, failover | 50 | 307 req/s | 105 ms | 487 ms | 900 ms | 0 / 18,522 |
 
-| Concurrency | Throughput | p50 | p95 | p99 | Errors |
-|---|---|---|---|---|---|
-| 10 | **623 req/s** | **9.6 ms** | 51 ms | 88 ms | 0 / 9,356 |
-| 50 | 301 req/s | 110 ms | 490 ms | 843 ms | 0 / 9,077 |
+Mean of 3 × 20 s runs per row. With the primary provider down, its circuit opened after 3
+failures and no later request was lost. Profiling the healthy path found a new HTTP
+client built per request (~64 ms of TLS setup each); pooling it raised throughput from
+16 to 346 req/s. The earlier figure here (623 req/s) never reached a provider, because of
+a routing bug fixed on this branch.
 
-Sub-10 ms median routing overhead at a healthy load point; a single async worker saturates
-around c≈50 (the point to add workers / horizontal scale). Deterministic bucketing means the
-flag decision itself is an in-process FNV-1a hash with **no database round-trip**.
+Deterministic bucketing means the flag decision itself is an in-process FNV-1a hash with
+**no database round-trip**.
 
 ---
 

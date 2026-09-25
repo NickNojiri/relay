@@ -1,0 +1,1 @@
+{"providers":{"echo":{"state":"closed","consecutive_failures":0},"ollama":{"state":"open","consecutive_failures":3}}}

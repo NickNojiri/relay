@@ -12,8 +12,11 @@ The shared base is the branch named below, not `main`. `main` and
 
 ```text
 BASE:            claude/relay-provider-resilience @ 76eb8f4 (the merge commit)
-TESTS:           prompt-ops: uv run pytest -> 46 passed, 3 skipped
-LANE 1 (Claude): provider reliability and routing: DONE, awaiting review
+TESTS:           prompt-ops: uv run pytest -> 52 passed, 3 skipped
+LANE 1 (Claude): DONE, awaiting review. Failover, breakers, timeouts, passive health,
+                 streaming on all four providers, graceful shutdown (real SIGTERM test),
+                 pooled provider clients (16 -> 346 req/s), re-benchmark with raw
+                 results in services/prompt-ops/loadtest/results/
 LANE 2 (Codex):  observability: request IDs, Prometheus /metrics, Grafana: NOT STARTED
 ```
 
@@ -21,7 +24,7 @@ LANE 2 (Codex):  observability: request IDs, Prometheus /metrics, Grafana: NOT S
 
 | Lane | Owner | Roadmap items | Files it owns |
 |---|---|---|---|
-| 1 Reliability | Claude Code | per-provider timeouts, circuit breakers, no retry on partial streams, passive health, failover routing, provider-failure test | `app/routing.py`, `app/providers.py`, the `/v1/chat*` handlers and `/health/providers` in `app/main.py`, `tests/test_routing.py` |
+| 1 Reliability | Claude Code | per-provider timeouts, circuit breakers, no retry on partial streams, passive health, failover routing, provider-failure test, streaming on all providers, graceful shutdown, load test rerun | `app/routing.py`, `app/providers.py`, the `/v1/chat*` handlers, `/health/providers` and the lifespan in `app/main.py`, `tests/test_routing.py`, `tests/test_shutdown.py`, `loadtest/` |
 | 2 Observability | Codex | request IDs and trace-context propagation, Prometheus metrics (latency, tokens, provider errors, routing decisions), Grafana dashboard | new `app/request_id.py`, new `app/metrics.py`, new `infra/grafana/`, `tests/test_metrics.py`, the middleware and `/metrics` lines in `app/main.py` just after `instrument_app(app)` |
 
 `app/main.py` is shared. Lane 1 touches only the route handlers. Lane 2 touches only the
@@ -37,6 +40,8 @@ app-setup block at the top (middleware, `/metrics`). Keep your edits inside your
 
 ## Not yet claimed
 
-Active health probes, cost/latency-based routing policy, graceful shutdown and connection
-draining, re-running `loadtest/bench.py` after both lanes land, Rust profiling, Kubernetes.
+Active health probes (they would spend paid-API calls, so they need a budget decision
+first), cost- or latency-based routing, a data-retention doc, Rust profiling (the Rust
+code is only the flag decision, and only in native builds), Kubernetes. After Lane 2
+lands, rerun `loadtest/run_all.sh` to measure what /metrics costs.
 Claim one here before starting it.

@@ -45,6 +45,18 @@ splits 50/50 between two prompt versions, so the service is runnable standalone 
   `llm.served_by` and `llm.fallbacks`. Errors are recorded as a class (`HTTP 503`,
   `timeout`, `ConnectError`), never as prompt text.
 
+All four providers stream real tokens (Ollama NDJSON; Anthropic and OpenAI SSE), and each
+provider reuses one pooled HTTP client, which is closed at shutdown.
+
+## Graceful shutdown
+
+On SIGTERM uvicorn stops accepting connections, lets in-flight requests and open streams
+finish for up to 30 s (`--timeout-graceful-shutdown 30` in the Dockerfile), then closes
+the provider clients and the database pool. `fly.toml` sends SIGTERM and waits 35 s, so
+Fly doesn't cut a stream off mid-answer. `tests/test_shutdown.py` runs a real uvicorn,
+sends SIGTERM mid-stream, and checks that the stream completes and new connections are
+refused.
+
 Breaker state lives in the process, so with several gateway instances each one keeps its
 own breakers. That fits a single-instance deploy; a shared store would be needed to scale
 out.
