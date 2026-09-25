@@ -1,3 +1,5 @@
+import json
+
 import httpx
 import pytest
 
@@ -61,3 +63,42 @@ async def test_openai_request_and_parse():
     c = await provider.complete(model="gpt-4o-mini", system="s", user="u")
     assert c.text == "yo"
     assert (c.prompt_tokens, c.completion_tokens) == (7, 1)
+
+
+@pytest.mark.asyncio
+async def test_ollama_stream_yields_incremental_chunks():
+    """The streaming path must emit deltas as they arrive, not one final blob —
+    otherwise time-to-first-token equals total latency and SSE buys nothing."""
+    ndjson = (
+        b'{"message":{"content":"Hello"},"done":false}\n'
+        b'{"message":{"content":" there"},"done":false}\n'
+        b'\n'
+        b'{"message":{"content":"!"},"done":false}\n'
+        b'{"message":{"content":""},"done":true}\n'
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/chat"
+        assert json.loads(request.content)["stream"] is True
+        return httpx.Response(200, content=ndjson)
+
+    provider = OllamaProvider("http://ollama.test", transport=httpx.MockTransport(handler))
+    chunks = [c async for c in provider.stream(model="llama3.2", system="s", user="u")]
+    assert chunks == ["Hello", " there", "!"]
+
+
+@pytest.mark.asyncio
+async def test_ollama_stream_stops_on_done_and_skips_malformed_lines():
+    ndjson = (
+        b'not-json\n'
+        b'{"message":{"content":"a"},"done":false}\n'
+        b'{"message":{"content":""},"done":true}\n'
+        b'{"message":{"content":"never"},"done":false}\n'
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=ndjson)
+
+    provider = OllamaProvider("http://ollama.test", transport=httpx.MockTransport(handler))
+    chunks = [c async for c in provider.stream(model="m", system="s", user="u")]
+    assert chunks == ["a"]

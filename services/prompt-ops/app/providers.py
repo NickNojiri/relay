@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -58,6 +59,40 @@ class OllamaProvider:
             prompt_tokens=int(data.get("prompt_eval_count", 0)),
             completion_tokens=int(data.get("eval_count", 0)),
         )
+
+    async def stream(self, *, model: str, system: str, user: str):
+        """Yields content deltas as Ollama produces them.
+
+        Ollama's streaming mode returns newline-delimited JSON, one object per
+        token-ish chunk. Without this, /v1/chat/stream falls back to complete()
+        and emits the whole response as a single frame — which is SSE in shape
+        only: time-to-first-token equals total latency.
+        """
+        payload = {
+            "model": model,
+            "stream": True,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+        }
+        async with httpx.AsyncClient(timeout=120, transport=self._transport) as client:
+            async with client.stream(
+                "POST", f"{self._base_url}/api/chat", json=payload
+            ) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if not line.strip():
+                        continue
+                    try:
+                        data = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    chunk = data.get("message", {}).get("content", "")
+                    if chunk:
+                        yield chunk
+                    if data.get("done"):
+                        break
 
 
 class AnthropicProvider:
