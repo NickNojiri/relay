@@ -10,7 +10,14 @@ from fastapi.responses import StreamingResponse
 
 from .config import Settings, get_settings
 from .flags import Decision, EvalContext, evaluate
-from .providers import LLMProvider, get_provider
+from .routing import (
+    KNOWN_PROVIDERS,
+    AllProvidersFailed,
+    Attempt,
+    MidStreamFailure,
+    ProviderRouter,
+    get_router,
+)
 from .repository import (
     PromptVersion,
     Repository,
@@ -48,6 +55,24 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/health/providers")
+def provider_health(router: ProviderRouter = Depends(get_router)) -> dict:
+    """Circuit state per provider, as observed from real traffic (passive health)."""
+    return {"providers": router.health()}
+
+
+def _target(version: PromptVersion, settings: Settings) -> tuple[str, str]:
+    """The provider and model this prompt version asks for, else the defaults."""
+    name = version.provider or settings.relay_default_provider
+    if name not in KNOWN_PROVIDERS:
+        raise HTTPException(status_code=502, detail=f"prompt version names unknown provider {name!r}")
+    return name, version.model or settings.relay_default_model
+
+
+def _routing(attempts: list[Attempt]) -> list[dict]:
+    return [{"provider": a.provider, "outcome": a.outcome, "error": a.error} for a in attempts]
+
+
 async def _resolve(req: ChatRequest, repo: Repository) -> tuple[PromptVersion, Decision]:
     """Pick the variant via the flag engine and load its prompt version."""
     with span("flag.resolve", **{"flag.key": req.prompt_key, "flag.unit_id": req.unit_id}) as s:
@@ -75,19 +100,27 @@ async def _resolve(req: ChatRequest, repo: Repository) -> tuple[PromptVersion, D
 async def chat(
     req: ChatRequest,
     repo: Repository = Depends(get_repository),
-    provider: LLMProvider = Depends(get_provider),
+    router: ProviderRouter = Depends(get_router),
     settings: Settings = Depends(get_settings),
 ) -> ChatResponse:
     version, decision = await _resolve(req, repo)
-    provider_name = version.provider or settings.relay_default_provider
-    model = version.model or settings.relay_default_model
+    preferred, model = _target(version, settings)
 
     start = time.perf_counter()
-    with span("provider.complete", **{"llm.provider": provider_name, "llm.model": model}) as s:
-        completion = await provider.complete(model=model, system=version.body, user=req.input)
+    with span("provider.complete", **{"llm.provider": preferred, "llm.model": model}) as s:
+        try:
+            routed = await router.complete(preferred, model, system=version.body, user=req.input)
+        except AllProvidersFailed as exc:
+            raise HTTPException(
+                status_code=503,
+                detail={"error": "no provider available", "routing": _routing(exc.attempts)},
+            ) from exc
+        completion = routed.completion
         set_attributes(
             s,
             **{
+                "llm.served_by": routed.provider,
+                "llm.fallbacks": len(routed.attempts) - 1,
                 "llm.prompt_tokens": completion.prompt_tokens,
                 "llm.completion_tokens": completion.completion_tokens,
             },
@@ -99,8 +132,8 @@ async def chat(
             prompt_version_id=version.id,
             flag_key=req.prompt_key,
             variant=decision.variant,
-            provider=provider_name,
-            model=model,
+            provider=routed.provider,
+            model=routed.model,
             prompt_tokens=completion.prompt_tokens,
             completion_tokens=completion.completion_tokens,
             latency_ms=latency_ms,
@@ -108,14 +141,15 @@ async def chat(
     )
     return ChatResponse(
         variant=decision.variant,
-        provider=provider_name,
-        model=model,
+        provider=routed.provider,
+        model=routed.model,
         output=completion.text,
         usage=Usage(
             prompt_tokens=completion.prompt_tokens,
             completion_tokens=completion.completion_tokens,
         ),
         latency_ms=latency_ms,
+        routing=_routing(routed.attempts),
     )
 
 
@@ -123,40 +157,55 @@ async def chat(
 async def chat_stream(
     req: ChatRequest,
     repo: Repository = Depends(get_repository),
-    provider: LLMProvider = Depends(get_provider),
+    router: ProviderRouter = Depends(get_router),
     settings: Settings = Depends(get_settings),
 ) -> StreamingResponse:
     version, decision = await _resolve(req, repo)
-    provider_name = version.provider or settings.relay_default_provider
-    model = version.model or settings.relay_default_model
+    preferred, model = _target(version, settings)
 
     async def event_stream() -> AsyncIterator[str]:
         start = time.perf_counter()
         parts: list[str] = []
-        stream = getattr(provider, "stream", None)
-        if stream is not None:
-            async for chunk in stream(model=model, system=version.body, user=req.input):
+        attempts: list[Attempt] = []
+        served_by, served_model = preferred, model
+        error: str | None = None
+        try:
+            async for served_by, served_model, chunk in router.stream(
+                preferred, model, system=version.body, user=req.input, attempts=attempts
+            ):
                 parts.append(chunk)
                 yield f"data: {json.dumps({'delta': chunk})}\n\n"
-        else:
-            completion = await provider.complete(model=model, system=version.body, user=req.input)
-            parts.append(completion.text)
-            yield f"data: {json.dumps({'delta': completion.text})}\n\n"
+        except AllProvidersFailed:
+            error = "no provider available"
+        except MidStreamFailure:
+            # Part of an answer is already on the wire; it is not retried.
+            error = "provider failed mid-stream"
 
         latency_ms = int((time.perf_counter() - start) * 1000)
+        routing = _routing(attempts)
+        if error is not None:
+            yield f"data: {json.dumps({'error': error, 'routing': routing})}\n\n"
+            return
         text = "".join(parts)
         await repo.record_telemetry(
             TelemetryEvent(
                 prompt_version_id=version.id,
                 flag_key=req.prompt_key,
                 variant=decision.variant,
-                provider=provider_name,
-                model=model,
+                provider=served_by,
+                model=served_model,
                 prompt_tokens=0,
                 completion_tokens=len(text.split()),
                 latency_ms=latency_ms,
             )
         )
-        yield f"data: {json.dumps({'done': True, 'variant': decision.variant, 'latencyMs': latency_ms})}\n\n"
+        done = {
+            "done": True,
+            "variant": decision.variant,
+            "provider": served_by,
+            "latencyMs": latency_ms,
+            "routing": routing,
+        }
+        yield f"data: {json.dumps(done)}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

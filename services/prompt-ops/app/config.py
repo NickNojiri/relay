@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     # Observability (opt-in; see app/telemetry_otel.py). Exporter is configured
     # via the standard OTEL_EXPORTER_OTLP_ENDPOINT env var.
     relay_otel_enabled: bool = False
+    # Provider routing (see app/routing.py). The chain is opt-in; empty means
+    # one provider, one try, as before.
+    relay_fallback_chain: str = ""            # e.g. "openai:gpt-4o-mini,ollama:llama3.2"
+    relay_provider_timeout_s: float = 60.0    # per attempt; time-to-first-chunk for streams
+    relay_breaker_failures: int = 3           # consecutive failures that open a circuit
+    relay_breaker_reset_s: float = 30.0       # how long a circuit stays open before a trial
 
 
 @lru_cache

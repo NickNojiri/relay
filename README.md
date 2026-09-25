@@ -119,14 +119,15 @@ relay/
 | 6 | Deploy: configs + runbook + CI/CD — see **[docs/DEPLOY.md](docs/DEPLOY.md)** | ✅ ready |
 | 4b | Native Rust bindings (napi-rs / Wasm / PyO3) + cross-binding conformance | ✅ |
 | 10 | Hardening: API-key auth · rate limiting · OpenTelemetry tracing · perf-benchmarked | ✅ |
+| 11 | Provider failover: per-provider timeouts · circuit breakers · `/health/providers` | ✅ |
 | 7–8 | Live deploy + production numbers (needs hosting accounts) | ⏳ next |
 
 **What's next:** ship it live and measure it — the prioritized plan lives in
 **[docs/ROADMAP.md](docs/ROADMAP.md)**.
 
 **Security:** `pnpm audit` → **0 known vulnerabilities**; opt-in gateway API keys + rate
-limiting. **Tests:** flag-sdk 10 (vitest, incl. native-engine conformance) · prompt-ops 24
-(pytest, incl. PyO3 conformance) · flag-core 7 (cargo, incl. the shared fixture) · flag-wasm 2
+limiting. **Tests:** flag-sdk 10 (vitest, incl. native-engine conformance) · prompt-ops 46
+(pytest, incl. PyO3 conformance and provider failover) · flag-core 7 (cargo, incl. the shared fixture) · flag-wasm 2
 (node:test) · `clippy` clean · studio `next build` (9 routes).
 
 ---

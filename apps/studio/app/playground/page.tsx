@@ -51,7 +51,9 @@ export default function PlaygroundPage() {
             done?: boolean;
             variant?: string | null;
             latencyMs?: number;
+            error?: string;
           };
+          if (payload.error) setError(payload.error);
           if (payload.delta) {
             acc += payload.delta;
             setOutput(acc);

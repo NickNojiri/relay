@@ -12,6 +12,12 @@ class Usage(BaseModel):
     completion_tokens: int
 
 
+class RoutingAttempt(BaseModel):
+    provider: str
+    outcome: str  # ok | failed | circuit_open
+    error: str | None = None
+
+
 class ChatResponse(BaseModel):
     variant: str | None
     provider: str
@@ -19,3 +25,5 @@ class ChatResponse(BaseModel):
     output: str
     usage: Usage
     latency_ms: int
+    # Providers tried, in order; more than one entry means a failover happened.
+    routing: list[RoutingAttempt] = []

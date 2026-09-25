@@ -3,8 +3,9 @@ from fastapi.testclient import TestClient
 
 from app.flags import FlagRule, FlagVariant
 from app.main import app
-from app.providers import EchoProvider, get_provider
+from app.providers import EchoProvider
 from app.repository import InMemoryRepository, PromptVersion, get_repository
+from app.routing import ProviderRouter, get_router
 
 
 def _seeded() -> InMemoryRepository:
@@ -24,7 +25,7 @@ def _seeded() -> InMemoryRepository:
 def seeded():
     repo = _seeded()
     app.dependency_overrides[get_repository] = lambda: repo
-    app.dependency_overrides[get_provider] = lambda: EchoProvider()
+    app.dependency_overrides[get_router] = lambda: ProviderRouter(lambda name: EchoProvider())
     yield repo, TestClient(app)
     app.dependency_overrides.clear()
 

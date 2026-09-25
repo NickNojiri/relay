@@ -6,8 +6,9 @@ from fastapi.testclient import TestClient
 from app.config import Settings, get_settings
 from app.flags import FlagRule, FlagVariant
 from app.main import app
-from app.providers import EchoProvider, get_provider
+from app.providers import EchoProvider
 from app.repository import InMemoryRepository, PromptVersion, get_repository
+from app.routing import ProviderRouter, get_router
 from app.security import limiter
 
 PAYLOAD = {"prompt_key": "prompt.support-bot", "unit_id": "user-42", "input": "hi"}
@@ -29,7 +30,7 @@ def _client(**settings_overrides) -> TestClient:
     settings = Settings(relay_db_enabled=False, **settings_overrides)
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[get_repository] = lambda: _seeded()
-    app.dependency_overrides[get_provider] = lambda: EchoProvider()
+    app.dependency_overrides[get_router] = lambda: ProviderRouter(lambda name: EchoProvider())
     return TestClient(app)
 
 

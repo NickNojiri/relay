@@ -163,14 +163,20 @@ class OpenAIProvider:
 
 def build_provider(settings: Settings) -> LLMProvider:
     """Select a provider by config. `echo` is network-free; the rest proxy a real API."""
-    provider = settings.relay_default_provider
-    if provider == "echo":
+    return build_named_provider(settings.relay_default_provider, settings)
+
+
+def build_named_provider(name: str, settings: Settings) -> LLMProvider:
+    """The provider called `name`, configured from settings."""
+    if name == "echo":
         return EchoProvider()
-    if provider == "anthropic":
+    if name == "anthropic":
         return AnthropicProvider(settings.anthropic_api_key or "")
-    if provider == "openai":
+    if name == "openai":
         return OpenAIProvider(settings.openai_api_key or "")
-    return OllamaProvider(settings.ollama_base_url)
+    if name == "ollama":
+        return OllamaProvider(settings.ollama_base_url)
+    raise ValueError(f"unknown provider {name!r}")
 
 
 def get_provider() -> LLMProvider:
