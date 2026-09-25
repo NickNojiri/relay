@@ -7,7 +7,7 @@
 ![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white)
 ![WebAssembly](https://img.shields.io/badge/WebAssembly-654FF0?logo=webassembly&logoColor=white)
 
-_Rust flag engine · Next.js studio · FastAPI gateway · native napi/Wasm/PyO3 bindings · Yjs live collaboration · 0 audit vulns · ~620 req/s routing @ 9.6 ms p50._
+_Rust flag engine · Next.js studio · FastAPI gateway · native napi/Wasm/PyO3 bindings · Yjs live collaboration · 0 audit vulns · ~650 req/s routing @ 9.7 ms p50 (local, 1 worker)._
 
 **An end-to-end prompt-deployment platform.** Author an AI system prompt, ship it through a
 gateway, A/B-test it with feature flags, and track cost & latency per version — so you can tell
@@ -125,7 +125,7 @@ relay/
 **[docs/ROADMAP.md](docs/ROADMAP.md)**.
 
 **Security:** `pnpm audit` → **0 known vulnerabilities**; opt-in gateway API keys + rate
-limiting. **Tests:** flag-sdk 10 (vitest, incl. native-engine conformance) · prompt-ops 24
+limiting. **Tests:** flag-sdk 10 (vitest, incl. native-engine conformance) · prompt-ops 30
 (pytest, incl. PyO3 conformance) · flag-core 7 (cargo, incl. the shared fixture) · flag-wasm 2
 (node:test) · `clippy` clean · studio `next build` (9 routes).
 
@@ -133,24 +133,32 @@ limiting. **Tests:** flag-sdk 10 (vitest, incl. native-engine conformance) · pr
 
 ## Performance
 
-Measured against a local single-worker gateway (Uvicorn) with the network-free `echo`
-provider, so the numbers isolate the **flag-eval + routing + telemetry overhead** — the work
-Relay adds on top of the LLM call — rather than model latency. Reproduce with the committed
-harness (`services/prompt-ops/loadtest/bench.py`, or `flag-eval.k6.js` if you have k6):
+Measured on a local single-worker gateway (Uvicorn) with the network-free `echo` provider and no
+database, so the numbers isolate the **flag-eval + routing + telemetry overhead** (the work
+Relay adds on top of the LLM call) rather than model latency. The load generator runs on the
+same 4-vCPU machine (Xeon @ 2.1 GHz). Rerun with one command from `services/prompt-ops`:
 
 ```
-RELAY_DEFAULT_PROVIDER=echo uv run uvicorn app.main:app --port 8000   # terminal A
-uv run python loadtest/bench.py --concurrency 10 --duration 15        # terminal B
+uv run python loadtest/bench.py --label <machine>
 ```
 
-| Concurrency | Throughput | p50 | p95 | p99 | Errors |
-|---|---|---|---|---|---|
-| 10 | **623 req/s** | **9.6 ms** | 51 ms | 88 ms | 0 / 9,356 |
-| 50 | 301 req/s | 110 ms | 490 ms | 843 ms | 0 / 9,077 |
+The harness launches the gateway with pinned settings, warms up, and runs each level 3 times.
+It commits the config, a machine/git manifest and every request's raw timing
+([loadtest/README.md](services/prompt-ops/loadtest/README.md)). Two back-to-back runs from
+commit `f6907ed`, medians of 3 repeats:
 
-Sub-10 ms median routing overhead at a healthy load point; a single async worker saturates
-around c≈50 (the point to add workers / horizontal scale). Deterministic bucketing means the
-flag decision itself is an in-process FNV-1a hash with **no database round-trip**.
+| Concurrency | Run | Throughput | p50 | p95 | p99 | Errors |
+|---|---|---|---|---|---|---|
+| 1 | [A](services/prompt-ops/loadtest/results/20260925T090641Z-echo-sandbox-4vcpu/summary.md) | 453 req/s | 2.13 ms | 2.96 ms | 4.02 ms | 0 / 13,354 |
+| 1 | [B](services/prompt-ops/loadtest/results/20260925T090820Z-echo-sandbox-4vcpu/summary.md) | 455 req/s | 2.08 ms | 2.87 ms | 3.80 ms | 0 / 13,653 |
+| 10 | A | **651 req/s** | **9.77 ms** | 44.6 ms | 74.6 ms | 0 / 19,662 |
+| 10 | B | **665 req/s** | **9.57 ms** | 44.0 ms | 75.7 ms | 0 / 20,156 |
+
+About 2 ms of gateway overhead per request with no contention, reproducible within about 2%
+between runs. Deterministic bucketing means the flag decision itself is an in-process FNV-1a
+hash with **no database round-trip**. At c=50, one worker is past saturation: throughput drops
+below the c=10 figure and swings 340–503 req/s within a single run (raw data in the same run
+folders). That shows where to add workers, but it's too noisy to compare changes against.
 
 ---
 

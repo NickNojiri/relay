@@ -1,0 +1,54 @@
+{
+  "started_at_utc": "2026-09-25T09:08:20+00:00",
+  "git_sha": "f6907edf491bd706b92d02821ce7cf98c3388c03",
+  "git_dirty": false,
+  "gateway_url": "http://127.0.0.1:8765",
+  "gateway_launched_by_bench": true,
+  "client_and_gateway_same_host": true,
+  "machine": {
+    "cpu_model": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "logical_cpus": 4,
+    "memory_gb": 15.7,
+    "os": "Linux-6.18.44-fc-v37-x86_64-with-glibc2.39",
+    "python": "3.11.15"
+  },
+  "packages": {
+    "fastapi": "0.137.1",
+    "starlette": "1.3.1",
+    "uvicorn": "0.49.0",
+    "httpx": "0.28.1",
+    "pydantic": "2.13.4"
+  },
+  "config": {
+    "name": "echo",
+    "gateway": {
+      "port": 8765,
+      "workers": 1,
+      "access_log": false,
+      "env": {
+        "RELAY_DEFAULT_PROVIDER": "echo",
+        "RELAY_DEFAULT_MODEL": "echo",
+        "RELAY_DB_ENABLED": "false",
+        "RELAY_API_KEYS": "",
+        "RELAY_RATE_LIMIT_PER_MINUTE": "0",
+        "RELAY_OTEL_ENABLED": "false"
+      }
+    },
+    "load": {
+      "endpoint": "/v1/chat",
+      "prompt_key": "prompt.support-bot",
+      "input": "hello",
+      "unit_ids": 10000,
+      "seed": 1,
+      "concurrency": [
+        1,
+        10,
+        50
+      ],
+      "warmup_s": 2,
+      "duration_s": 10,
+      "repeats": 3,
+      "timeout_s": 30
+    }
+  }
+}

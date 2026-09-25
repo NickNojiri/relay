@@ -40,9 +40,11 @@ strongest differentiator for a personal project.
 ATS matches keywords; humans shortlist **quantified** bullets. Everything here already exists
 as scaffolding — it just needs to be *run* against the live deployment and written down.
 
-- [x] Load-tested the gateway routing path (local, `echo` provider) → **623 req/s, p50 9.6 ms,
-      p95 51 ms, p99 88 ms, 0 errors**; published in the README **Performance** section and
-      reproducible via `loadtest/bench.py` (k6-free) or `flag-eval.k6.js`.
+- [x] Load-tested the gateway routing path (local, `echo` provider, 1 worker, 4 vCPU) →
+      **c=10: 651–665 req/s, p50 9.6–9.8 ms, p95 44 ms, p99 75 ms, 0 errors; c=1: 2.1 ms p50**.
+      Reproducible harness (`loadtest/bench.py` + committed config); two runs with raw per-request
+      data in `services/prompt-ops/loadtest/results/` agree within ~2%. Published in the README
+      **Performance** section.
 - [ ] *(needs live deploy)* Re-run the same harness against the Fly gateway for production
       numbers, and record a synthetic A/B cost-per-request delta (the "reduced LLM cost X%"
       bullet — the product's whole pitch).
@@ -110,9 +112,9 @@ becomes true at the marked phase; never put a bullet on the resume before its ph
 - Built **real-time collaborative editing** with CRDTs (**Yjs**) over WebSockets, supporting
   concurrent multi-user prompt drafting with presence/awareness.
 - Engineered a **multi-provider LLM gateway** (Anthropic Claude, OpenAI, Ollama) with **SSE
-  token streaming** and a TTL flag cache; load-tested the routing path to **~620 req/s at
-  9.6 ms median / 51 ms p95** with **zero errors** (single async worker) via a committed k6 +
-  async harness.
+  token streaming** and a TTL flag cache; load-tested the routing path to **~650 req/s at
+  9.7 ms median / 44 ms p95** with **zero errors** (single async worker, local), with a
+  reproducible harness whose reruns agree within 2% and whose raw data is committed.
 - Instrumented per-request token/latency **telemetry** enabling data-driven prompt A/B
   tests; per-variant cost/latency aggregates surface in the dashboard. *(A headline
   "reduced cost X%" number needs the live A/B run — see Phase 8.)*
