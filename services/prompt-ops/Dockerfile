@@ -22,4 +22,7 @@ EXPOSE 8000
 # WORKDIR is /app. Newer uv rejects that ("cannot normalize a relative path
 # beyond the base directory") and the container exits before binding the port.
 ENV PATH="/app/.venv/bin:$PATH"
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# On SIGTERM uvicorn stops accepting connections and lets in-flight requests
+# (including open SSE streams) finish for up to 30 s before closing them; see
+# tests/test_shutdown.py. Keep fly.toml's kill_timeout above this.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--timeout-graceful-shutdown", "30"]

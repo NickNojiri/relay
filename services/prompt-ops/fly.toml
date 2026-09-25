@@ -2,6 +2,12 @@
 app = "relay-prompt-ops"
 primary_region = "sjc"
 
+# Graceful shutdown: send SIGTERM and wait longer than uvicorn's 30 s drain
+# window (Dockerfile) before Fly force-kills the machine. Fly's default is
+# SIGINT with a 5 s wait, which would cut long streams off mid-answer.
+kill_signal = "SIGTERM"
+kill_timeout = 35
+
 [build]
   dockerfile = "Dockerfile"
 
