@@ -1,0 +1,13 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "relay-flag-py"
+version = "0.1.0"
+description = "Native Relay flag-engine binding (PyO3 over flag-core)."
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+[tool.maturin]
+module-name = "relay_flag_py"

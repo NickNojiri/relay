@@ -1,13 +1,12 @@
-# Rust workspace for the flag engine.
-# Phase 0 ships only `flag-core` (the verified rule-eval core). The binding crates
-# (flag-node = napi-rs, flag-wasm = wasm-bindgen, flag-py = PyO3) join in Phase 4.
+# Rust workspace for the flag engine: `flag-core` (the verified rule-eval core)
+# plus the Phase 4b binding crates, each a thin wrapper over `flag_core::evaluate_json`.
 [workspace]
 resolver = "2"
 members = [
     "packages/flag-core",
-    # "packages/flag-node",  # Phase 4 — napi-rs Node addon
-    # "packages/flag-wasm",  # Phase 4 — wasm-bindgen edge/browser
-    # "packages/flag-py",    # Phase 4 — PyO3 Python wheel
+    "packages/flag-node", # napi-rs Node addon
+    "packages/flag-wasm", # wasm-bindgen edge/browser
+    "packages/flag-py",   # PyO3 Python wheel
 ]
 
 [workspace.package]

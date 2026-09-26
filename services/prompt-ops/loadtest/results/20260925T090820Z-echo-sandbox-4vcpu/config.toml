@@ -1,0 +1,25 @@
+# Gateway overhead baseline: flag evaluation + routing + telemetry recording, with the
+# network-free Echo provider and the in-memory seeded repository (no LLM, no database).
+name = "echo"
+
+[gateway]
+# Used when bench.py launches the gateway itself (i.e. no --gateway flag).
+port = 8765
+workers = 1
+access_log = false
+# Set explicitly so a local .env can't change what is being measured.
+env = { RELAY_DEFAULT_PROVIDER = "echo", RELAY_DEFAULT_MODEL = "echo", RELAY_DB_ENABLED = "false", RELAY_API_KEYS = "", RELAY_RATE_LIMIT_PER_MINUTE = "0", RELAY_OTEL_ENABLED = "false" }
+
+[load]
+endpoint = "/v1/chat"
+prompt_key = "prompt.support-bot"
+input = "hello"
+# Each request uses unit id user-<n>, n drawn from a generator seeded per (seed, level, worker).
+unit_ids = 10000
+seed = 1
+# Closed loop: each worker sends its next request as soon as the previous one returns.
+concurrency = [1, 10, 50]
+warmup_s = 2
+duration_s = 10
+repeats = 3
+timeout_s = 30

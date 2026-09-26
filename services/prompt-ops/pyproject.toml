@@ -17,9 +17,24 @@ dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
 ]
+# Native flag engine (PyO3 wheel built from packages/flag-py; needs a Rust
+# toolchain). Opt in with `uv sync --group native`; without it the pure-Python
+# port in app/flags.py is used.
+native = [
+    "relay-flag-py",
+]
+# Distributed tracing (opt-in with RELAY_OTEL_ENABLED); `uv sync --group otel`
+otel = [
+    "opentelemetry-sdk>=1.27",
+    "opentelemetry-exporter-otlp-proto-http>=1.27",
+    "opentelemetry-instrumentation-fastapi>=0.48b0",
+]
 
 [tool.uv]
 package = false
+
+[tool.uv.sources]
+relay-flag-py = { path = "../../packages/flag-py" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

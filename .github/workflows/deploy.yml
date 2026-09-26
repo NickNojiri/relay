@@ -1,16 +1,25 @@
 name: Deploy services
 
-# Deploys the two long-lived Fly services on push to main.
+# Deploys the two long-lived Fly services.
 # Studio (Next.js) is deployed by Vercel's GitHub integration, not here.
-# Requires repo secret: FLY_API_TOKEN.
+#
+# Required GitHub Actions secrets:
+#   FLY_API_TOKEN      - Fly personal access token (org-scoped, so it can create apps)
+#   DATABASE_URL       - Neon Postgres connection string
+#   ANTHROPIC_API_KEY  - provider key for the gateway
+#   RELAY_API_KEYS     - gateway API key(s), comma-separated; the studio's PROMPT_OPS_API_KEY
+#                        must be one of them. The singular RELAY_API_KEY is accepted too.
+#
+# Manual only (Actions tab -> "Run workflow"): production is torn down between demos, and a
+# push-triggered deploy would recreate the paid Fly apps. See docs/DEPLOY.md.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "services/**"
-      - "packages/**"
-      - ".github/workflows/deploy.yml"
   workflow_dispatch:
+
+env:
+  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+  # Fly org slug that owns the apps. Override with the FLY_ORG repo variable
+  # (Settings -> Secrets and variables -> Actions -> Variables) if yours differs.
+  FLY_ORG: ${{ vars.FLY_ORG || 'personal' }}
 
 jobs:
   prompt-ops:
@@ -18,23 +27,82 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
-      - run: >
-          flyctl deploy --remote-only
-          --config services/prompt-ops/fly.toml
-          --dockerfile services/prompt-ops/Dockerfile
-          services/prompt-ops
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      - name: Show what this token can see
+        run: flyctl orgs list
+      # An empty RELAY_API_KEYS disables auth entirely (see app/security.py), which
+      # would leave the public gateway — and the Anthropic key behind it — wide open.
+      # Fail loudly instead of shipping that.
+      - name: Require the gateway API key
+        run: |
+          if [ -z "${{ secrets.RELAY_API_KEYS || secrets.RELAY_API_KEY }}" ]; then
+            echo "::error::Neither RELAY_API_KEYS nor RELAY_API_KEY is set."
+            echo "Without one the gateway accepts unauthenticated /v1 requests."
+            echo "Add it under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+          echo "Gateway API key is set."
+      - name: Ensure app exists
+        run: flyctl apps create relay-prompt-ops --org "$FLY_ORG" || flyctl apps list
+      - name: Stage secrets
+        run: >
+          flyctl secrets set --app relay-prompt-ops --stage
+          DATABASE_URL="${{ secrets.DATABASE_URL }}"
+          ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}"
+          RELAY_API_KEYS="${{ secrets.RELAY_API_KEYS || secrets.RELAY_API_KEY }}"
+          RELAY_DB_ENABLED=true
+          RELAY_DEFAULT_PROVIDER=anthropic
+          RELAY_DEFAULT_MODEL=claude-3-5-haiku-latest
+          RELAY_RATE_LIMIT_PER_MINUTE=60
+      # flyctl resolves --config relative to the app directory, so run from inside it
+      # with plain relative paths rather than passing a positional directory.
+      - name: Deploy
+        working-directory: services/prompt-ops
+        run: flyctl deploy --remote-only --config fly.toml --dockerfile Dockerfile
 
   sync-server:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
-      - run: >
+      - name: Show what this token can see
+        run: flyctl orgs list
+      - name: Ensure app exists
+        run: flyctl apps create relay-sync-nojiri --org "$FLY_ORG" || flyctl apps list
+      - name: Deploy
+        run: >
           flyctl deploy --remote-only
           --config services/sync-server/fly.toml
           --dockerfile services/sync-server/Dockerfile
           .
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  # Post-deploy check. Runners can reach *.fly.dev, so this both proves the
+  # gateway serves traffic and surfaces startup crashes (a bad DATABASE_URL, say)
+  # that a successful `flyctl deploy` would not reveal.
+  verify:
+    needs: [prompt-ops, sync-server]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # The gateway runs with min_machines_running = 0, so the first request pays
+      # the cold start. A slow first hit then a fast second one is healthy; two
+      # failures mean the app itself is unhealthy.
+      - name: Probe /health (cold, then warm)
+        run: |
+          for attempt in 1 2; do
+            echo "--- attempt $attempt ---"
+            curl -sS -m 90 -o /tmp/body \
+              -w 'http=%{http_code} total=%{time_total}s\n' \
+              https://relay-prompt-ops.fly.dev/health || echo "curl exit $?"
+            head -c 500 /tmp/body; echo
+          done
+      - name: Gateway status and logs
+        if: always()
+        run: |
+          flyctl status --app relay-prompt-ops
+          flyctl logs --app relay-prompt-ops --no-tail
+      - name: Sync server status and logs
+        if: always()
+        run: |
+          flyctl status --app relay-sync-nojiri
+          flyctl logs --app relay-sync-nojiri --no-tail

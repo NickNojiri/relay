@@ -1,7 +1,9 @@
-# Phase 4b — Native flag-engine bindings (DEFERRED)
+# Phase 4b — Native flag-engine bindings (✅ SHIPPED)
 
-**Status:** deferred by decision (2026-06-17). **Implement after the final phase (Phase 6,
-deploy) is done.**
+**Status:** implemented (2026-07-02) on a Linux environment, exactly as this plan prescribed.
+All three bindings are thin wrappers over `flag_core::evaluate_json` (the `serde` feature adds
+the shared camelCase wire format to the core), and CI's `bindings` job builds each one and runs
+every conformance suite. The original deferral rationale below is kept for the record.
 
 ## What this is
 The Rust `flag-core` engine (`packages/flag-core`) ships as **one verified core with three
@@ -40,6 +42,16 @@ unit tests run on CI (Linux).
    `services/prompt-ops`, swap `app/flags.py` for the native call (keep the port as fallback).
 5. **CI** — add jobs to build each binding and run the cross-binding conformance suite.
 
-## Acceptance
-`cargo test --workspace` green (incl. the fixture conformance test), and TS / Python / Rust all
-assert the same `cases.json` decisions.
+## Acceptance — met
+`cargo test --workspace --features flag-core/serde` green (incl. the fixture conformance test),
+and TS / Python / Rust — plus the napi addon, the wasm build, and the PyO3 wheel — all assert
+the same `cases.json` decisions:
+
+- Rust: `packages/flag-core/tests/conformance.rs` (struct + JSON-boundary paths)
+- napi: `packages/flag-sdk/src/native.test.ts` (conformance + 500-case TS-parity)
+- wasm: `packages/flag-wasm/test/conformance.test.mjs`
+- PyO3: `services/prompt-ops/tests/test_native_engine.py` (conformance + 500-case parity)
+
+The native paths are opt-in with verified fallbacks: `enableNativeEngine()` in the TS SDK
+(pure-TS otherwise, always in browsers), `uv sync --group native` for the gateway (Python port
+otherwise).

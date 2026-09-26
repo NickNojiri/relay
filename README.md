@@ -1,5 +1,14 @@
 # Relay
 
+[![CI](https://github.com/NickNojiri/relay/actions/workflows/ci.yml/badge.svg)](https://github.com/NickNojiri/relay/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+![Rust](https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white)
+![WebAssembly](https://img.shields.io/badge/WebAssembly-654FF0?logo=webassembly&logoColor=white)
+
+_Rust flag engine · Next.js studio · FastAPI gateway · native napi/Wasm/PyO3 bindings · Yjs live collaboration · 0 audit vulns · ~650 req/s routing @ 9.7 ms p50 (local, 1 worker)._
+
 **An end-to-end prompt-deployment platform.** Author an AI system prompt, ship it through a
 gateway, A/B-test it with feature flags, and track cost & latency per version — so you can tell
 which prompt actually wins in production.
@@ -60,11 +69,14 @@ which version performs better.
 
 ## The flag engine — one algorithm, three languages
 
-The rule for "which version does this user get?" is written **three times** — in **Rust**
-(`packages/flag-core`), **TypeScript** (`@relay/flag-sdk`), and **Python** (`prompt-ops`) — and
-a shared test file (`packages/flag-core/conformance/cases.json`) proves all three produce the
-*exact same answer* for every case. That "one verified core, zero drift" story is the headline
-engineering flex.
+The rule for "which version does this user get?" lives in one **Rust** core
+(`packages/flag-core`) that ships to every runtime as a **native binding**: a Node addon
+(`flag-node`, napi-rs), a **WebAssembly** build for edge/browsers (`flag-wasm`, wasm-bindgen),
+and a Python wheel (`flag-py`, PyO3). The **TypeScript** (`@relay/flag-sdk`) and **Python**
+(`prompt-ops`) ports remain as verified fallbacks, and a shared test file
+(`packages/flag-core/conformance/cases.json`) proves every engine — core, bindings, and both
+ports — produces the *exact same answer* for every case. That "one verified core, zero drift"
+story is the headline engineering flex.
 
 > **Why three languages?** The website is TypeScript, the gateway is Python, and the engine is
 > Rust for portability. Re-implementing the same logic and *proving* they match is exactly what
@@ -82,7 +94,10 @@ relay/
 │  └─ sync-server/         real-time collaboration server (Yjs CRDT over WebSockets)
 ├─ packages/
 │  ├─ flag-core/           the Rust flag-evaluation engine + the shared conformance test
-│  ├─ flag-sdk/            the TypeScript version of the engine
+│  ├─ flag-node/           native Node addon over flag-core (napi-rs)
+│  ├─ flag-wasm/           WebAssembly build of flag-core for edge/browsers (wasm-bindgen)
+│  ├─ flag-py/             Python wheel over flag-core (PyO3 + maturin)
+│  ├─ flag-sdk/            the TypeScript SDK (native engine when built, pure-TS fallback)
 │  ├─ db/                  database schema + migrations (Drizzle + Postgres)
 │  ├─ core/                shared settings + types
 │  ├─ ui/                  shared design system (Tailwind + shadcn)
@@ -102,17 +117,59 @@ relay/
 | 4a | Rust `flag-core` engine + 3-language conformance | ✅ |
 | 5 | Multi-provider (Claude/OpenAI/Ollama) + live streaming + flag cache | ✅ |
 | 6 | Deploy: configs + runbook + CI/CD — see **[docs/DEPLOY.md](docs/DEPLOY.md)** | ✅ ready |
-| 4b | Native Rust bindings (napi-rs / Wasm / PyO3) | ⏸️ deferred — **[plan](docs/PHASE-4B-BINDINGS.md)** |
+| 4b | Native Rust bindings (napi-rs / Wasm / PyO3) + cross-binding conformance | ✅ |
+| 10 | Hardening: API-key auth · rate limiting · OpenTelemetry tracing · perf-benchmarked | ✅ |
+| 7–8 | Live deploy + production numbers (needs hosting accounts) | ⏳ next |
 
-**Security:** `pnpm audit` → **0 known vulnerabilities**. **Tests:** flag-sdk 7 (vitest) ·
-prompt-ops 15 (+1 skip, pytest) · flag-core `cargo check` + `clippy` clean · studio `next build`
-(9 routes).
+**What's next:** ship it live and measure it — the prioritized plan lives in
+**[docs/ROADMAP.md](docs/ROADMAP.md)**.
+
+**Security:** `pnpm audit` → **0 known vulnerabilities**; opt-in gateway API keys + rate
+limiting. **Tests:** flag-sdk 10 (vitest, incl. native-engine conformance) · prompt-ops 30
+(pytest, incl. PyO3 conformance) · flag-core 7 (cargo, incl. the shared fixture) · flag-wasm 2
+(node:test) · `clippy` clean · studio `next build` (9 routes).
+
+---
+
+## Performance
+
+Measured on a local single-worker gateway (Uvicorn) with the network-free `echo` provider and no
+database, so the numbers isolate the **flag-eval + routing + telemetry overhead** (the work
+Relay adds on top of the LLM call) rather than model latency. The load generator runs on the
+same 4-vCPU machine (Xeon @ 2.1 GHz). Rerun with one command from `services/prompt-ops`:
+
+```
+uv run python loadtest/bench.py --label <machine>
+```
+
+The harness launches the gateway with pinned settings, warms up, and runs each level 3 times.
+It commits the config, a machine/git manifest and every request's raw timing
+([loadtest/README.md](services/prompt-ops/loadtest/README.md)). Two back-to-back runs from
+commit `f6907ed`, medians of 3 repeats:
+
+| Concurrency | Run | Throughput | p50 | p95 | p99 | Errors |
+|---|---|---|---|---|---|---|
+| 1 | [A](services/prompt-ops/loadtest/results/20260925T090641Z-echo-sandbox-4vcpu/summary.md) | 453 req/s | 2.13 ms | 2.96 ms | 4.02 ms | 0 / 13,354 |
+| 1 | [B](services/prompt-ops/loadtest/results/20260925T090820Z-echo-sandbox-4vcpu/summary.md) | 455 req/s | 2.08 ms | 2.87 ms | 3.80 ms | 0 / 13,653 |
+| 10 | A | **651 req/s** | **9.77 ms** | 44.6 ms | 74.6 ms | 0 / 19,662 |
+| 10 | B | **665 req/s** | **9.57 ms** | 44.0 ms | 75.7 ms | 0 / 20,156 |
+
+About 2 ms of gateway overhead per request with no contention, reproducible within about 2%
+between runs. Deterministic bucketing means the flag decision itself is an in-process FNV-1a
+hash with **no database round-trip**. At c=50, one worker is past saturation: throughput drops
+below the c=10 figure and swings 340–503 req/s within a single run (raw data in the same run
+folders). That shows where to add workers, but it's too noisy to compare changes against.
 
 ---
 
 ## Run it on your own computer
 
-You need [Node](https://nodejs.org) and [Docker](https://www.docker.com/products/docker-desktop/);
+**Fastest:** with only [Docker](https://www.docker.com/products/docker-desktop/) installed, run
+`make demo` (Windows: `.\scripts\demo.ps1`). It starts the whole stack with a seeded prompt and
+A/B flag at http://localhost:3000. It needs no API keys and has no cloud cost; see
+[docs/DEPLOY.md](docs/DEPLOY.md#local-demo).
+
+**For development**, you need [Node](https://nodejs.org) and [Docker](https://www.docker.com/products/docker-desktop/);
 optionally [uv](https://docs.astral.sh/uv/) (Python) and [Ollama](https://ollama.com) for the AI.
 
 ```bash
@@ -134,10 +191,10 @@ to `uv` and set `NODE_OPTIONS=--use-system-ca` before pnpm.)*
 
 ## Putting it online (optional)
 
-Everything is configured for free hosting tiers; **[docs/DEPLOY.md](docs/DEPLOY.md)** is a
-copy-paste runbook. Short version: **Neon** hosts the database, **Upstash** hosts Redis, **Fly.io**
-runs the gateway + collaboration server, and **Vercel** runs the website. The final `deploy`
-commands are the only steps that need your own (free) accounts.
+Relay has run in production: **Neon** hosted the database, **Fly.io** ran the gateway and
+collaboration server, and **Vercel** ran the website, all deployed from GitHub Actions. It has
+since been taken down to avoid hosting cost. **[docs/DEPLOY.md](docs/DEPLOY.md)** has the exact
+steps to bring it back.
 
 ---
 
@@ -157,15 +214,16 @@ commands are the only steps that need your own (free) accounts.
   hash so it's stable and needs no database lookup.
 - **Monorepo** — one Git repository holding several apps/packages. **Polyglot** = in multiple
   programming languages (here Rust + TypeScript + Python).
-- **Binding (napi-rs / Wasm / PyO3)** — a wrapper that lets other languages call Rust code. (These
-  are the deferred Phase 4b — see the plan doc.)
+- **Binding (napi-rs / Wasm / PyO3)** — a wrapper that lets other languages call Rust code. Relay
+  ships all three, so Node, edge/browser, and Python all evaluate flags with the same Rust engine.
 
 ---
 
 ## Tech
 
-TypeScript · Rust · Python · Next.js (App Router, Server Actions) · FastAPI · Drizzle ORM ·
-Postgres · Redis · Yjs (CRDT) · Turborepo · pnpm · Cargo · Docker · Vitest · pytest · GitHub Actions.
+TypeScript · Rust · Python · Next.js (App Router, Server Actions) · FastAPI · napi-rs ·
+WebAssembly (wasm-bindgen) · PyO3/maturin · Drizzle ORM · Postgres · Redis · Yjs (CRDT) ·
+Turborepo · pnpm · Cargo · Docker · Vitest · pytest · k6/async load-testing · OpenTelemetry · GitHub Actions.
 
 ## License
 

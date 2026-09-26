@@ -14,6 +14,8 @@ target/
 **/*.node
 **/*.wasm
 !**/src/**/*.wasm
+packages/flag-wasm/pkg/
+packages/flag-wasm/pkg-node/
 
 # stray installers (e.g. rustup-init.exe)
 *.exe

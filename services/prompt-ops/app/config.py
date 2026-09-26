@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     relay_db_enabled: bool = False
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
+    # Gateway hardening (both opt-in; see app/security.py)
+    relay_api_keys: str = ""
+    relay_rate_limit_per_minute: int = 0
+    # Observability (opt-in; see app/telemetry_otel.py). Exporter is configured
+    # via the standard OTEL_EXPORTER_OTLP_ENDPOINT env var.
+    relay_otel_enabled: bool = False
 
 
 @lru_cache

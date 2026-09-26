@@ -1,4 +1,7 @@
 const GATEWAY = process.env.PROMPT_OPS_URL ?? "http://localhost:8000";
+// When the gateway enforces RELAY_API_KEYS, the proxy authenticates server-side
+// so the key never reaches the browser.
+const GATEWAY_KEY = process.env.PROMPT_OPS_API_KEY;
 
 /** Server-side proxy that pipes the gateway's SSE stream through to the browser. */
 export async function POST(req: Request) {
@@ -6,7 +9,10 @@ export async function POST(req: Request) {
   try {
     const upstream = await fetch(`${GATEWAY}/v1/chat/stream`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(GATEWAY_KEY ? { authorization: `Bearer ${GATEWAY_KEY}` } : {}),
+      },
       body: JSON.stringify(body),
     });
     if (!upstream.ok || !upstream.body) {

@@ -10,3 +10,15 @@ authors.workspace = true
 crate-type = ["rlib"]
 
 [dependencies]
+# Optional: JSON (de)serialization of the rule/decision types with the same
+# camelCase field names the TS SDK and conformance fixture use. All three
+# bindings (napi / wasm / PyO3) turn this on so they share one wire format.
+serde = { version = "1.0.228", features = ["derive"], optional = true }
+serde_json = { version = "1.0.150", optional = true }
+
+[features]
+serde = ["dep:serde", "dep:serde_json"]
+
+[dev-dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"

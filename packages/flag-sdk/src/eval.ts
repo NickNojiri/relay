@@ -1,3 +1,4 @@
+import { nativeEvaluate } from "./native";
 import type { Decision, EvalContext, FlagRule } from "./types";
 
 const encoder = new TextEncoder();
@@ -22,10 +23,17 @@ function bucket(flagKey: string, unitId: string, salt: string): number {
 }
 
 /**
- * Pure-TS reference evaluation (the "walking-skeleton" engine). In Phase 4 the
- * native Rust binding replaces this behind the same signature.
+ * Evaluate a flag. Routes through the native Rust engine when
+ * `enableNativeEngine()` has been called (Phase 4b), otherwise — and always in
+ * browsers/edge — uses the pure-TS reference implementation below. Both are
+ * pinned to identical decisions by the shared conformance suite.
  */
 export function evaluate(rule: FlagRule, ctx: EvalContext): Decision {
+  return nativeEvaluate(rule, ctx) ?? evaluateTs(rule, ctx);
+}
+
+/** Pure-TS reference evaluation (the fallback engine). */
+export function evaluateTs(rule: FlagRule, ctx: EvalContext): Decision {
   if (!rule.enabled) {
     return { enabled: false, variant: null, reason: "flag_disabled" };
   }
