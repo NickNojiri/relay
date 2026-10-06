@@ -2,7 +2,8 @@
 
     uv run python loadtest/bench.py --config loadtest/configs/echo.toml
 
-Starts the gateway with the settings pinned in the config (or targets --gateway URL),
+Starts the gateway (and, if the config has an [upstream] section, a stand-in provider
+server) with the settings pinned in the config, or targets --gateway URL. It
 runs every concurrency level `repeats` times after a warmup, and writes a run directory
 under loadtest/results/: config.toml, manifest.json, requests.csv.gz (one row per
 request), summary.csv (one row per level x repeat) and summary.md (medians + ranges).
@@ -33,6 +34,9 @@ from pathlib import Path
 import httpx
 
 SERVICE_DIR = Path(__file__).resolve().parents[1]
+# Only these are inherited by launched servers, so a machine's proxy or CA-bundle settings
+# can't change what is measured. Everything else comes from the config.
+INHERITED_ENV = ["PATH", "HOME", "USERPROFILE", "SYSTEMROOT", "SYSTEMDRIVE", "TEMP", "TMP", "TMPDIR", "LANG", "LC_ALL"]
 RAW_FIELDS = ["concurrency", "repeat", "worker", "seq", "start_ms", "latency_ms", "status", "variant", "unit_id", "error"]
 SUMMARY_FIELDS = ["concurrency", "repeat", "requests", "ok", "errors", "wall_s", "throughput_rps", "p50_ms", "p95_ms", "p99_ms", "max_ms"]
 
@@ -208,16 +212,24 @@ def manifest(config: dict, gateway_url: str, launched: bool) -> dict:
     }
 
 
-def start_gateway(gw: dict) -> subprocess.Popen:
-    env = {**os.environ, **{k: str(v) for k, v in gw["env"].items()}}
+def _serve(app_path: str, port: int, env: dict, workers: int = 1, access_log: bool = False) -> subprocess.Popen:
     cmd = [
-        sys.executable, "-m", "uvicorn", "app.main:app",
-        "--host", "127.0.0.1", "--port", str(gw["port"]),
-        "--workers", str(gw["workers"]), "--log-level", "warning",
+        sys.executable, "-m", "uvicorn", app_path,
+        "--host", "127.0.0.1", "--port", str(port),
+        "--workers", str(workers), "--log-level", "warning",
     ]
-    if not gw.get("access_log", False):
+    if not access_log:
         cmd.append("--no-access-log")
-    return subprocess.Popen(cmd, cwd=SERVICE_DIR, env=env)
+    base = {k: os.environ[k] for k in INHERITED_ENV if k in os.environ}
+    return subprocess.Popen(cmd, cwd=SERVICE_DIR, env={**base, **{k: str(v) for k, v in env.items()}})
+
+
+def start_gateway(gw: dict) -> subprocess.Popen:
+    return _serve("app.main:app", gw["port"], gw["env"], gw["workers"], gw.get("access_log", False))
+
+
+def start_upstream(up: dict) -> subprocess.Popen:
+    return _serve("loadtest.stub_upstream:app", up["port"], {"STUB_DELAY_MS": up.get("delay_ms", 0)})
 
 
 def wait_healthy(url: str, timeout_s: float = 30) -> None:
@@ -285,13 +297,18 @@ def main() -> None:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out_dir = args.out / "-".join(filter(None, [stamp, config["name"], args.label]))
 
-    proc = start_gateway(config["gateway"]) if launched else None
+    procs: list[subprocess.Popen] = []
     try:
+        if launched and "upstream" in config:
+            procs.append(start_upstream(config["upstream"]))
+            wait_healthy(f"http://127.0.0.1:{config['upstream']['port']}")
+        if launched:
+            procs.append(start_gateway(config["gateway"]))
         wait_healthy(url)
         man = manifest(config, url, launched)
         rows, summaries = asyncio.run(run_all(config, url, args.api_key))
     finally:
-        if proc is not None:
+        for proc in reversed(procs):
             proc.terminate()
             proc.wait(timeout=10)
 

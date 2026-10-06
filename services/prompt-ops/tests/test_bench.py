@@ -83,3 +83,16 @@ async def test_write_results_produces_a_complete_run_directory(client, tmp_path)
     with open(out / "summary.csv") as f:
         assert next(csv.DictReader(f))["ok"] == str(summaries[0]["ok"])
     assert "| 2 |" in (out / "summary.md").read_text()
+
+
+async def test_stub_upstream_answers_ollama_and_openai_shapes():
+    from loadtest import stub_upstream
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=stub_upstream.app), base_url="http://stub") as c:
+        ollama = (await c.post("/api/chat", json={"model": "m", "messages": []})).json()
+        assert ollama["message"]["content"] == stub_upstream.REPLY
+        openai = (await c.post("/v1/chat/completions", json={"model": "m", "messages": []})).json()
+        assert openai["choices"][0]["message"]["content"] == stub_upstream.REPLY
+        streamed = await c.post("/api/chat", json={"model": "m", "messages": [], "stream": True})
+        lines = [json.loads(line) for line in streamed.text.splitlines()]
+        assert lines[-1]["done"] is True and "".join(l["message"]["content"] for l in lines).strip() == stub_upstream.REPLY

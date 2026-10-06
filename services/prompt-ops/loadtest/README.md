@@ -14,9 +14,10 @@ uv run python loadtest/bench.py --label <machine>        # e.g. --label 7800x3d
 
 This takes about 100 seconds. The script:
 
-1. Starts the gateway with the settings in `configs/echo.toml`: one Uvicorn worker, access log
-   off, Echo provider, in-memory seeded repository, auth, rate limit and tracing off. Those
-   settings are passed as environment variables, so a local `.env` can't change what's measured.
+1. Starts the gateway with the settings in the config: one Uvicorn worker, access log off,
+   in-memory seeded repository, auth, rate limit and tracing off. Servers get only basic system
+   variables (`PATH`, `HOME`, …) plus the config's own settings, so a local `.env`, proxy or
+   CA-bundle setting can't change what's measured.
 2. For each concurrency level, sends load for `warmup_s` and discards those results, then runs
    `repeats` measured phases of `duration_s` each.
 3. Stops the gateway and writes `results/<UTC time>-<config>-<label>/`.
@@ -28,13 +29,22 @@ that the gateway's settings were not controlled by the harness.
 Commit a finished run from a clean working tree. The manifest records `git_sha` and `git_dirty`,
 and a dirty run can't be tied to the code that produced it.
 
+## Configs
+
+| Config | What the gateway calls | Use it for |
+|--------|------------------------|------------|
+| `configs/echo.toml` (default) | Nothing: the Echo provider answers in-process | Flag evaluation, routing and telemetry overhead |
+| `configs/ollama-stub.toml` | `stub_upstream.py`, an Ollama-compatible server the harness starts, which answers instantly | The gateway's own cost of calling a provider over HTTP (client setup, connections) |
+
+Run a non-default config with `--config loadtest/configs/ollama-stub.toml`.
+
 ## What it measures
 
 `POST /v1/chat` with the seeded `prompt.support-bot` A/B flag. Each request pays for flag
 evaluation, prompt-version lookup, the Echo "completion" and a telemetry write, which is the work
 the gateway adds on top of a model call. There is no model and no database in the path. The Echo
-provider makes no outbound HTTP call, so this config can't show changes to provider HTTP
-handling such as connection pooling. Measuring those needs a config with a real upstream.
+provider makes no outbound HTTP call, so it can't show changes to provider HTTP handling such
+as connection pooling; `ollama-stub.toml` measures that.
 
 Workers run a **closed loop**: each worker sends its next request as soon as the previous one
 returns, so concurrency is the number of requests in flight. Each worker draws unit IDs from a
