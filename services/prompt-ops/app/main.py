@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 
 from .config import Settings, get_settings
 from .flags import Decision, EvalContext, evaluate
-from .providers import LLMProvider, get_provider
+from .providers import LLMProvider, ProviderRegistry, get_provider
 from .repository import (
     PromptVersion,
     Repository,
@@ -32,7 +32,9 @@ async def lifespan(app: FastAPI):
 
         pool = await asyncpg.create_pool(dsn=settings.database_url)
         set_pool(pool)
+    app.state.providers = ProviderRegistry(settings)
     yield
+    await app.state.providers.aclose()
     if pool is not None:
         await pool.close()
 
