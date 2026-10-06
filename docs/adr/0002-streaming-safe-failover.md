@@ -32,7 +32,7 @@ user would see duplicated or contradictory text, and both providers would bill f
 
 ## Evidence
 
-- `services/prompt-ops/tests/test_failover.py`: 22 tests drive the real endpoints and the real
+- `services/prompt-ops/tests/test_failover.py`: 21 tests drive the real endpoints and the real
   provider HTTP code with faults injected at the HTTP layer (read and connect timeouts, refused
   and dropped connections, 429, 500, 503, 400/401/404/422, a stream that drops after its first
   token). Mutation checks: the tests fail if 4xx were retried, if a stream failed over after its

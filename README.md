@@ -160,6 +160,15 @@ hash with **no database round-trip**. At c=50, one worker is past saturation: th
 below the c=10 figure and swings 340–503 req/s within a single run (raw data in the same run
 folders). That shows where to add workers, but it's too noisy to compare changes against.
 
+**Calling providers.** Against an instant stand-in provider, reusing one pooled HTTP client per
+provider instead of building one per call took a single worker from **31 to 239 req/s** and the
+median from **28.1 to 3.9 ms** ([ADR 0001](docs/adr/0001-pooled-provider-clients.md)).
+
+**Surviving a provider outage.** Prompt versions have ordered fallbacks. The gateway switches
+only on timeouts, connection failures, 429 and 5xx, and never after a stream's first token. With
+the primary provider killed and restored under load, **5,921 of 5,921 requests succeeded**, 1,846
+of them through the fallback ([ADR 0002](docs/adr/0002-streaming-safe-failover.md)).
+
 ---
 
 ## Run it on your own computer

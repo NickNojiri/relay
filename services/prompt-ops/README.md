@@ -6,8 +6,15 @@ Relay's LLM gateway (FastAPI). For each request it:
    a Python port of `@relay/flag-sdk`'s FNV-1a evaluation; Phase 4 replaces it with the
    native `flag-py` PyO3 binding),
 2. loads that prompt version,
-3. proxies the completion to a provider (Ollama by default; OpenAI/Anthropic later),
-4. logs `{variant, provider, model, tokens, latency}` telemetry.
+3. calls the version's provider (Ollama, Anthropic, OpenAI or any OpenAI-compatible server),
+   falling back in order to the version's `fallbacks`, then `RELAY_FALLBACKS`, when a provider
+   times out, can't be reached, or returns 429/5xx, and never after a stream's first token
+   ([ADR 0002](../../docs/adr/0002-streaming-safe-failover.md)),
+4. logs `{variant, provider, model, tokens, latency, fallback_reason}` telemetry.
+
+Each provider keeps one pooled HTTP client for the life of the app
+([ADR 0001](../../docs/adr/0001-pooled-provider-clients.md)), with its own timeouts
+(`RELAY_TIMEOUTS`).
 
 ## Run
 
