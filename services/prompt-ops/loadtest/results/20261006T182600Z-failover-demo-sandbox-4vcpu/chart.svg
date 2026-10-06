@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 260" font-family="sans-serif" font-size="11">
+<rect width="640" height="260" fill="#ffffff"/>
+<rect x="49.0" y="157.3" width="24.5" height="70.7" fill="#0d7766"/>
+<rect x="75.5" y="39.6" width="24.5" height="188.4" fill="#0d7766"/>
+<rect x="102.1" y="40.2" width="24.5" height="187.8" fill="#0d7766"/>
+<rect x="128.6" y="23.6" width="24.5" height="204.4" fill="#0d7766"/>
+<rect x="155.2" y="37.0" width="24.5" height="191.0" fill="#0d7766"/>
+<rect x="181.7" y="34.5" width="24.5" height="193.5" fill="#0d7766"/>
+<rect x="208.3" y="26.8" width="24.5" height="201.2" fill="#0d7766"/>
+<rect x="208.3" y="24.9" width="24.5" height="1.9" fill="#b45f06"/>
+<rect x="234.8" y="64.4" width="24.5" height="163.6" fill="#b45f06"/>
+<rect x="261.4" y="77.1" width="24.5" height="150.9" fill="#b45f06"/>
+<rect x="287.9" y="73.9" width="24.5" height="154.1" fill="#b45f06"/>
+<rect x="314.5" y="61.8" width="24.5" height="166.2" fill="#b45f06"/>
+<rect x="341.0" y="59.9" width="24.5" height="168.1" fill="#b45f06"/>
+<rect x="367.5" y="51.0" width="24.5" height="177.0" fill="#b45f06"/>
+<rect x="394.1" y="59.9" width="24.5" height="168.1" fill="#b45f06"/>
+<rect x="420.6" y="66.9" width="24.5" height="161.1" fill="#0d7766"/>
+<rect x="420.6" y="41.5" width="24.5" height="25.5" fill="#b45f06"/>
+<rect x="447.2" y="16.0" width="24.5" height="212.0" fill="#0d7766"/>
+<rect x="473.7" y="23.6" width="24.5" height="204.4" fill="#0d7766"/>
+<rect x="500.3" y="17.9" width="24.5" height="210.1" fill="#0d7766"/>
+<rect x="526.8" y="37.0" width="24.5" height="191.0" fill="#0d7766"/>
+<rect x="553.4" y="38.3" width="24.5" height="189.7" fill="#0d7766"/>
+<rect x="579.9" y="38.9" width="24.5" height="189.1" fill="#0d7766"/>
+<line x1="233.8" y1="16" x2="233.8" y2="228" stroke="#18211e" stroke-dasharray="4 3"/>
+<text x="237.8" y="26" fill="#18211e">primary killed</text>
+<line x1="419.6" y1="16" x2="419.6" y2="228" stroke="#18211e" stroke-dasharray="4 3"/>
+<text x="423.6" y="26" fill="#18211e">primary back</text>
+<line x1="48" y1="228" x2="632" y2="228" stroke="#59655f"/>
+<text x="48" y="250" fill="#59655f">requests answered per second →</text>
+<rect x="248" y="241" width="10" height="10" fill="#0d7766"/><text x="262" y="250" fill="#18211e">ollama (primary)</text>
+<rect x="378" y="241" width="10" height="10" fill="#b45f06"/><text x="392" y="250" fill="#18211e">openai (fallback)</text>
+<rect x="508" y="241" width="10" height="10" fill="#c0262d"/><text x="522" y="250" fill="#18211e">errors</text>
+<text x="42" y="20" text-anchor="end" fill="#59655f">333</text>
+<text x="42" y="228" text-anchor="end" fill="#59655f">0</text>
+</svg>
