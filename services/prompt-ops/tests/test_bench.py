@@ -7,8 +7,9 @@ from pathlib import Path
 import httpx
 import pytest
 
+from app.config import Settings
 from app.main import app
-from app.providers import EchoProvider, get_provider
+from app.providers import EchoProvider, ProviderRegistry, get_providers
 from app.repository import get_repository, seed_demo
 from loadtest import bench
 
@@ -19,7 +20,7 @@ LOAD = tomllib.loads(CONFIG_PATH.read_text())["load"]
 @pytest.fixture
 def client():
     app.dependency_overrides[get_repository] = seed_demo
-    app.dependency_overrides[get_provider] = EchoProvider
+    app.dependency_overrides[get_providers] = lambda: ProviderRegistry(Settings(), providers={"ollama": EchoProvider()})
     yield httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://gateway")
     app.dependency_overrides.clear()
 

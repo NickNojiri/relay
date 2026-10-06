@@ -9,6 +9,12 @@ export type FlagVariant = {
   promptVersionId: string | null;
 };
 
+/** A provider + model the gateway can send a prompt to. */
+export type ProviderRoute = {
+  provider: string;
+  model: string;
+};
+
 /** A named prompt (e.g. "prompt.support-bot"). Versions accumulate beneath it. */
 export const prompts = pgTable("prompts", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -29,6 +35,8 @@ export const promptVersions = pgTable(
     body: text("body").notNull(),
     provider: text("provider"),
     model: text("model"),
+    /** Tried in order when provider/model can't answer (timeout, connection failure, 429, 5xx). */
+    fallbacks: jsonb("fallbacks").$type<ProviderRoute[]>().notNull().default([]),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("prompt_versions_prompt_idx").on(t.promptId)],
@@ -61,6 +69,8 @@ export const telemetry = pgTable(
     promptTokens: integer("prompt_tokens").notNull().default(0),
     completionTokens: integer("completion_tokens").notNull().default(0),
     latencyMs: integer("latency_ms").notNull(),
+    /** Why earlier routes were skipped, e.g. "ollama/llama3.2: timeout". Null if the first answered. */
+    fallbackReason: text("fallback_reason"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

@@ -60,7 +60,8 @@ The database is seeded (`infra/demo/seed.sql`) with a `prompt.support-bot` promp
   `OLLAMA_MODEL=<model>` (or `-OllamaModel <model>`) for another model.
 
 `make demo-down` stops the stack and keeps its data. `make demo-reset` also wipes the data, and the
-next `make demo` re-seeds it. `make demo-logs` follows the logs.
+next `make demo` re-seeds it. Run `make demo-reset` once after pulling a new migration: the
+database only applies migrations when it is created. `make demo-logs` follows the logs.
 
 ---
 
@@ -80,7 +81,8 @@ workflow is **manual-only**, so merging to `main` can't quietly recreate paid in
 
 ### 2. Apply the schema to Neon
 
-Either paste `packages/db/drizzle/0000_right_domino.sql` into Neon's SQL Editor and run it, or:
+Either paste each file in `packages/db/drizzle/` into Neon's SQL Editor and run them in order
+(`0000_…`, then `0001_…`), or:
 
 ```bash
 DATABASE_URL="<DATABASE_URL>" corepack pnpm --filter @relay/db db:migrate

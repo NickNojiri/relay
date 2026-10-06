@@ -7,7 +7,7 @@ from typing import Protocol
 import httpx
 from fastapi import Request
 
-from .config import Settings, get_settings
+from .config import Settings
 
 
 @dataclass
@@ -15,6 +15,28 @@ class Completion:
     text: str
     prompt_tokens: int
     completion_tokens: int
+
+
+class ProviderUnavailable(Exception):
+    """The registry can't offer this provider at all (unknown name, or no API key)."""
+
+    def __init__(self, name: str, reason: str) -> None:
+        super().__init__(f"{name}: {reason}")
+        self.reason = reason
+
+
+@dataclass(frozen=True)
+class Timeouts:
+    connect: float
+    read: float
+
+
+# A local Ollama may need a long first read while it loads a model into memory.
+DEFAULT_TIMEOUTS = {
+    "ollama": Timeouts(connect=3.0, read=120.0),
+    "anthropic": Timeouts(connect=5.0, read=60.0),
+    "openai": Timeouts(connect=5.0, read=60.0),
+}
 
 
 class LLMProvider(Protocol):
@@ -128,9 +150,12 @@ class AnthropicProvider:
 class OpenAIProvider:
     """OpenAI Chat Completions API."""
 
-    def __init__(self, api_key: str, client: httpx.AsyncClient) -> None:
+    def __init__(
+        self, api_key: str, client: httpx.AsyncClient, base_url: str = "https://api.openai.com"
+    ) -> None:
         self._api_key = api_key
         self._client = client
+        self._base_url = base_url.rstrip("/")
 
     async def complete(self, *, model: str, system: str, user: str) -> Completion:
         payload = {
@@ -140,9 +165,9 @@ class OpenAIProvider:
                 {"role": "user", "content": user},
             ],
         }
-        headers = {"authorization": f"Bearer {self._api_key}"}
+        headers = {"authorization": f"Bearer {self._api_key}"} if self._api_key else {}
         resp = await self._client.post(
-            "https://api.openai.com/v1/chat/completions", headers=headers, json=payload
+            f"{self._base_url}/v1/chat/completions", headers=headers, json=payload
         )
         resp.raise_for_status()
         data = resp.json()
@@ -164,10 +189,15 @@ class ProviderRegistry:
     provider call.
     """
 
-    def __init__(self, settings: Settings, transport: httpx.AsyncBaseTransport | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        transport: httpx.AsyncBaseTransport | None = None,
+        providers: dict[str, LLMProvider] | None = None,
+    ) -> None:
         self._settings = settings
         self._transport = transport
-        self._providers: dict[str, LLMProvider] = {}
+        self._providers: dict[str, LLMProvider] = dict(providers or {})
         self._clients: list[httpx.AsyncClient] = []
 
     def get(self, name: str) -> LLMProvider:
@@ -175,9 +205,17 @@ class ProviderRegistry:
             self._providers[name] = self._build(name)
         return self._providers[name]
 
-    def _client(self) -> httpx.AsyncClient:
+    def timeouts(self, name: str) -> Timeouts:
+        override = self._settings.relay_timeouts.get(name, {})
+        default = DEFAULT_TIMEOUTS.get(name, Timeouts(connect=5.0, read=60.0))
+        return Timeouts(
+            connect=override.get("connect", default.connect), read=override.get("read", default.read)
+        )
+
+    def _client(self, name: str) -> httpx.AsyncClient:
+        t = self.timeouts(name)
         client = httpx.AsyncClient(
-            timeout=120,
+            timeout=httpx.Timeout(t.read, connect=t.connect),
             transport=self._transport,
             limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
         )
@@ -188,18 +226,24 @@ class ProviderRegistry:
         s = self._settings
         if name == "echo":
             return EchoProvider()
+        if name == "ollama":
+            return OllamaProvider(s.ollama_base_url, self._client(name))
         if name == "anthropic":
-            return AnthropicProvider(s.anthropic_api_key or "", self._client())
+            if not s.anthropic_api_key:
+                raise ProviderUnavailable(name, "not_configured")
+            return AnthropicProvider(s.anthropic_api_key, self._client(name))
         if name == "openai":
-            return OpenAIProvider(s.openai_api_key or "", self._client())
-        return OllamaProvider(s.ollama_base_url, self._client())
+            # A self-hosted OpenAI-compatible server may not need a key.
+            if not s.openai_api_key and s.openai_base_url == "https://api.openai.com":
+                raise ProviderUnavailable(name, "not_configured")
+            return OpenAIProvider(s.openai_api_key or "", self._client(name), s.openai_base_url)
+        raise ProviderUnavailable(name, "unknown_provider")
 
     async def aclose(self) -> None:
         for client in self._clients:
             await client.aclose()
 
 
-def get_provider(request: Request) -> LLMProvider:
-    """Default FastAPI dependency: the configured default provider from the app's registry.
-    Overridden with EchoProvider in tests."""
-    return request.app.state.providers.get(get_settings().relay_default_provider)
+def get_providers(request: Request) -> ProviderRegistry:
+    """FastAPI dependency: the registry built in the app lifespan. Tests override it."""
+    return request.app.state.providers

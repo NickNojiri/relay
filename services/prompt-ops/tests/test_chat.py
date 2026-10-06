@@ -1,9 +1,10 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from app.config import Settings
 from app.flags import FlagRule, FlagVariant
 from app.main import app
-from app.providers import EchoProvider, get_provider
+from app.providers import EchoProvider, ProviderRegistry, get_providers
 from app.repository import InMemoryRepository, PromptVersion, get_repository
 
 
@@ -24,7 +25,7 @@ def _seeded() -> InMemoryRepository:
 def seeded():
     repo = _seeded()
     app.dependency_overrides[get_repository] = lambda: repo
-    app.dependency_overrides[get_provider] = lambda: EchoProvider()
+    app.dependency_overrides[get_providers] = lambda: ProviderRegistry(Settings(), providers={"ollama": EchoProvider()})
     yield repo, TestClient(app)
     app.dependency_overrides.clear()
 

@@ -101,6 +101,17 @@ async def test_openai_request_and_parse():
 
 
 @pytest.mark.asyncio
+async def test_openai_compatible_server_without_a_key_gets_no_auth_header():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.host == "llm.local"
+        assert "authorization" not in request.headers
+        return httpx.Response(200, json={"choices": [{"message": {"content": "local"}}], "usage": {}})
+
+    provider = OpenAIProvider("", _client(handler), base_url="http://llm.local")
+    assert (await provider.complete(model="m", system="s", user="u")).text == "local"
+
+
+@pytest.mark.asyncio
 async def test_ollama_stream_yields_incremental_chunks():
     """The streaming path must emit deltas as they arrive, not one final blob —
     otherwise time-to-first-token equals total latency and SSE buys nothing."""

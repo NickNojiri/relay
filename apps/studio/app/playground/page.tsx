@@ -5,6 +5,8 @@ import { useState } from "react";
 interface Done {
   variant: string | null;
   latencyMs: number;
+  servedBy?: string;
+  fallbackReason?: string;
 }
 
 export default function PlaygroundPage() {
@@ -51,13 +53,22 @@ export default function PlaygroundPage() {
             done?: boolean;
             variant?: string | null;
             latencyMs?: number;
+            servedBy?: string;
+            fallbackReason?: string;
+            error?: string;
           };
           if (payload.delta) {
             acc += payload.delta;
             setOutput(acc);
           }
           if (payload.done) {
-            setMeta({ variant: payload.variant ?? null, latencyMs: payload.latencyMs ?? 0 });
+            setMeta({
+              variant: payload.variant ?? null,
+              latencyMs: payload.latencyMs ?? 0,
+              servedBy: payload.servedBy,
+              fallbackReason: payload.fallbackReason,
+            });
+            if (payload.error) setError(payload.error);
           }
         }
       }
@@ -128,6 +139,12 @@ export default function PlaygroundPage() {
                 variant: <b className="text-foreground">{meta.variant ?? "—"}</b>
               </span>
               <span>{meta.latencyMs} ms</span>
+              {meta.servedBy && (
+                <span>
+                  answered by: <b className="text-foreground">{meta.servedBy}</b>
+                </span>
+              )}
+              {meta.fallbackReason && <span>skipped: {meta.fallbackReason}</span>}
             </div>
           )}
           <pre className="mt-3 whitespace-pre-wrap break-words">{output}</pre>

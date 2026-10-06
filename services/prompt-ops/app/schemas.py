@@ -19,3 +19,5 @@ class ChatResponse(BaseModel):
     output: str
     usage: Usage
     latency_ms: int
+    # Set when earlier providers were skipped, e.g. "ollama/llama3.2: timeout".
+    fallback_reason: str | None = None

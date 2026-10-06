@@ -12,6 +12,7 @@ export default async function TelemetryPage() {
       avgLatency: avg(telemetry.latencyMs),
       promptTokens: sum(telemetry.promptTokens),
       completionTokens: sum(telemetry.completionTokens),
+      failovers: count(telemetry.fallbackReason),
     })
     .from(telemetry)
     .groupBy(telemetry.flagKey, telemetry.variant);
@@ -34,7 +35,8 @@ export default async function TelemetryPage() {
             <th className="py-2 pr-4">requests</th>
             <th className="py-2 pr-4">avg ms</th>
             <th className="py-2 pr-4">prompt tok</th>
-            <th className="py-2">completion tok</th>
+            <th className="py-2 pr-4">completion tok</th>
+            <th className="py-2">failovers</th>
           </tr>
         </thead>
         <tbody>
@@ -47,12 +49,13 @@ export default async function TelemetryPage() {
               <td className="py-2 pr-4">{r.n}</td>
               <td className="py-2 pr-4">{r.avgLatency ? Math.round(Number(r.avgLatency)) : "—"}</td>
               <td className="py-2 pr-4">{r.promptTokens ?? 0}</td>
-              <td className="py-2">{r.completionTokens ?? 0}</td>
+              <td className="py-2 pr-4">{r.completionTokens ?? 0}</td>
+              <td className="py-2">{r.failovers}</td>
             </tr>
           ))}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={6} className="py-3 text-muted-foreground">
+              <td colSpan={7} className="py-3 text-muted-foreground">
                 No telemetry yet — run a request from the playground.
               </td>
             </tr>

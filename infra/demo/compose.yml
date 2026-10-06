@@ -11,9 +11,10 @@ services:
       POSTGRES_DB: relay
     volumes:
       - pg:/var/lib/postgresql/data
-      # Runs once, on an empty volume: schema, then demo prompt + A/B flag.
+      # Runs once, on an empty volume: migrations in order, then demo prompt + A/B flag.
       - ../../packages/db/drizzle/0000_right_domino.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-      - ./seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      - ../../packages/db/drizzle/0001_peaceful_sister_grimm.sql:/docker-entrypoint-initdb.d/02-schema.sql:ro
+      - ./seed.sql:/docker-entrypoint-initdb.d/03-seed.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U relay -d relay"]
       interval: 2s

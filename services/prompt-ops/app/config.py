@@ -14,6 +14,14 @@ class Settings(BaseSettings):
     relay_db_enabled: bool = False
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
+    # Any OpenAI-compatible server (vLLM, LM Studio, Ollama's /v1) can stand in for OpenAI.
+    openai_base_url: str = "https://api.openai.com"
+    # Per-provider HTTP timeouts in seconds, e.g. {"ollama": {"connect": 2, "read": 60}}.
+    # Providers not listed use providers.DEFAULT_TIMEOUTS.
+    relay_timeouts: dict[str, dict[str, float]] = {}
+    # Routes tried after a prompt version's own fallbacks,
+    # e.g. [{"provider": "anthropic", "model": "claude-haiku-4-5"}].
+    relay_fallbacks: list[dict[str, str]] = []
     # Gateway hardening (both opt-in; see app/security.py)
     relay_api_keys: str = ""
     relay_rate_limit_per_minute: int = 0

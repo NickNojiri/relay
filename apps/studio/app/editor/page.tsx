@@ -1,9 +1,18 @@
-import { db, prompts, promptVersions } from "@relay/db";
+import { db, prompts, promptVersions, type ProviderRoute } from "@relay/db";
 import { desc, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { CollabEditor } from "./CollabEditor";
 
 export const dynamic = "force-dynamic";
+
+/** "anthropic:claude-haiku-4-5, openai:gpt-4o-mini" -> ordered routes; malformed entries are dropped. */
+function parseFallbacks(raw: string): ProviderRoute[] {
+  return raw
+    .split(",")
+    .map((entry) => entry.trim().split(":"))
+    .filter((parts) => parts.length === 2 && parts[0] && parts[1])
+    .map(([provider, model]) => ({ provider: provider!.trim(), model: model!.trim() }));
+}
 
 async function createPrompt(formData: FormData) {
   "use server";
@@ -20,13 +29,16 @@ async function addVersion(formData: FormData) {
   const body = String(formData.get("body") ?? "").trim();
   const provider = String(formData.get("provider") ?? "").trim() || null;
   const model = String(formData.get("model") ?? "").trim() || null;
+  const fallbacks = parseFallbacks(String(formData.get("fallbacks") ?? ""));
   if (!promptId || !body) return;
   const rows = await db
     .select({ max: sql<number>`coalesce(max(${promptVersions.version}), 0)` })
     .from(promptVersions)
     .where(eq(promptVersions.promptId, promptId));
   const nextVersion = Number(rows[0]?.max ?? 0) + 1;
-  await db.insert(promptVersions).values({ promptId, version: nextVersion, body, provider, model });
+  await db
+    .insert(promptVersions)
+    .values({ promptId, version: nextVersion, body, provider, model, fallbacks });
   revalidatePath("/editor");
 }
 
@@ -75,6 +87,11 @@ export default async function EditorPage() {
           <div className="flex flex-wrap gap-2">
             <input name="provider" placeholder="ollama" className="rounded-md border px-3 py-2 text-sm" />
             <input name="model" placeholder="llama3.2" className="rounded-md border px-3 py-2 text-sm" />
+            <input
+              name="fallbacks"
+              placeholder="fallbacks: anthropic:claude-haiku-4-5"
+              className="min-w-64 flex-1 rounded-md border px-3 py-2 text-sm"
+            />
             <button className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
               Save version
             </button>
@@ -98,7 +115,10 @@ export default async function EditorPage() {
           {versions.map((v) => (
             <li key={v.id} className="rounded-md border p-3">
               <div className="text-muted-foreground">
-                v{v.version} · {v.provider ?? "—"}/{v.model ?? "—"} ·{" "}
+                v{v.version} · {v.provider ?? "—"}/{v.model ?? "—"}
+                {v.fallbacks.length > 0 &&
+                  ` → ${v.fallbacks.map((f) => `${f.provider}/${f.model}`).join(" → ")}`}{" "}
+                ·{" "}
                 <code className="text-xs">{v.id}</code>
               </div>
               <div className="mt-1 whitespace-pre-wrap">{v.body}</div>

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from .failover import Route
 from .flags import FlagRule, FlagVariant
 
 
@@ -16,6 +17,7 @@ class PromptVersion:
     body: str
     provider: str | None = None
     model: str | None = None
+    fallbacks: list[Route] = field(default_factory=list)
 
 
 @dataclass
@@ -28,6 +30,8 @@ class TelemetryEvent:
     prompt_tokens: int
     completion_tokens: int
     latency_ms: int
+    # Why earlier routes were skipped, e.g. "ollama/llama3.2: timeout"; None if the first answered.
+    fallback_reason: str | None = None
 
 
 class Repository(Protocol):
@@ -61,6 +65,15 @@ class InMemoryRepository:
         self.telemetry.append(event)
 
 
+def parse_routes(raw: Any) -> list[Route]:
+    items = json.loads(raw) if isinstance(raw, str) else (raw or [])
+    return [
+        Route(r["provider"], r["model"])
+        for r in items
+        if isinstance(r, dict) and r.get("provider") and r.get("model")
+    ]
+
+
 def _parse_variants(raw: Any) -> list[FlagVariant]:
     items = json.loads(raw) if isinstance(raw, str) else (raw or [])
     # Stored by studio via Drizzle in the TS FlagVariant shape (camelCase keys).
@@ -90,7 +103,7 @@ class PostgresRepository:
     async def get_prompt_version(self, version_id: str) -> PromptVersion | None:
         row = await self._pool.fetchrow(
             "SELECT pv.id::text AS id, p.key AS prompt_key, pv.version, pv.body, "
-            "pv.provider, pv.model FROM prompt_versions pv "
+            "pv.provider, pv.model, pv.fallbacks FROM prompt_versions pv "
             "JOIN prompts p ON p.id = pv.prompt_id WHERE pv.id = $1::uuid",
             version_id,
         )
@@ -103,6 +116,7 @@ class PostgresRepository:
             body=row["body"],
             provider=row["provider"],
             model=row["model"],
+            fallbacks=parse_routes(row["fallbacks"]),
         )
 
     async def get_default_version_id(self, prompt_key: str) -> str | None:
@@ -117,8 +131,8 @@ class PostgresRepository:
     async def record_telemetry(self, event: TelemetryEvent) -> None:
         await self._pool.execute(
             "INSERT INTO telemetry (prompt_version_id, flag_key, variant, provider, "
-            "model, prompt_tokens, completion_tokens, latency_ms) "
-            "VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8)",
+            "model, prompt_tokens, completion_tokens, latency_ms, fallback_reason) "
+            "VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9)",
             event.prompt_version_id,
             event.flag_key,
             event.variant,
@@ -127,6 +141,7 @@ class PostgresRepository:
             event.prompt_tokens,
             event.completion_tokens,
             event.latency_ms,
+            event.fallback_reason,
         )
 
 
@@ -160,11 +175,10 @@ class CachedRepository:
 
 def seed_demo() -> InMemoryRepository:
     repo = InMemoryRepository()
-    repo.versions["v1"] = PromptVersion(
-        "v1", "prompt.support-bot", 1, "You are a terse support agent.", "ollama", "llama3.2"
-    )
+    # No provider/model pinned, so the gateway's configured default answers.
+    repo.versions["v1"] = PromptVersion("v1", "prompt.support-bot", 1, "You are a terse support agent.")
     repo.versions["v2"] = PromptVersion(
-        "v2", "prompt.support-bot", 2, "You are a warm, empathetic support agent.", "ollama", "llama3.2"
+        "v2", "prompt.support-bot", 2, "You are a warm, empathetic support agent."
     )
     repo.flags["prompt.support-bot"] = FlagRule(
         key="prompt.support-bot",
