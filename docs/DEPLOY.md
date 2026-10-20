@@ -8,7 +8,8 @@ authenticated traffic from Fly (`/health`: 5.7 s cold start, 0.18 s warm). The d
 been torn down so it costs nothing while idle. Everything needed to bring it back is committed; the
 steps below recreate it exactly, with every secret shown as a `<placeholder>`.
 
-To show Relay without any cloud spend, run it locally instead: [Local demo](#local-demo).
+To show Relay without any cloud spend, run it locally ([Local demo](#local-demo)) or host it on
+free tiers ([Free hosting](#free-hosting)).
 
 | Component | Host | Build |
 |-----------|------|-------|
@@ -65,7 +66,65 @@ database only applies migrations when it is created. `make demo-logs` follows th
 
 ---
 
-## Redeploy to production
+## Free hosting
+
+Everything below stays on free tiers and is done in a browser. No credit card is needed.
+
+| Piece | Host | Free-tier catch |
+|-------|------|-----------------|
+| Studio | Vercel Hobby | Personal, non-commercial use only |
+| Gateway + sync server | Render free web services (`render.yaml`) | Each sleeps after 15 min without traffic and takes about a minute to wake. Render gives 750 free hours a month per workspace, and a sleeping service uses none |
+| Database | Neon free | 0.5 GB, 100 compute-hours a month, scales to zero when idle |
+| Model | Groq free API, via the OpenAI-compatible provider | Per-minute and per-day request caps (see Groq's console) |
+
+### 1. Database (Neon)
+
+Create a project and copy its connection string as `<DATABASE_URL>`. In the SQL Editor, run each
+file in `packages/db/drizzle/` in order (`0000_…`, then `0001_…`), then `infra/demo/seed.sql`
+for a ready-made prompt and A/B flag.
+
+### 2. Model key (Groq)
+
+Create an API key at console.groq.com as `<GROQ_API_KEY>`. Make a gateway key too, any long
+random string, as `<GATEWAY_KEY>`.
+
+### 3. Gateway and sync server (Render)
+
+Dashboard → **New → Blueprint** → pick this repo. Render reads `render.yaml` and creates
+`relay-gateway` and `relay-sync`, then asks for the values marked secret:
+
+| Variable | Value |
+|----------|-------|
+| `DATABASE_URL` | `<DATABASE_URL>` |
+| `RELAY_API_KEYS` | `<GATEWAY_KEY>` |
+| `OPENAI_API_KEY` | `<GROQ_API_KEY>` |
+
+When both show **Live**, note their URLs, e.g. `https://relay-gateway-xxxx.onrender.com` and
+`https://relay-sync-xxxx.onrender.com`. Check `https://<gateway>/health` → `{"status":"ok"}`.
+
+### 4. Studio (Vercel)
+
+Import the repo with **Root Directory** `apps/studio` and set:
+
+| Variable | Value |
+|----------|-------|
+| `DATABASE_URL` | `<DATABASE_URL>` |
+| `PROMPT_OPS_URL` | `https://<gateway>` |
+| `PROMPT_OPS_API_KEY` | `<GATEWAY_KEY>` |
+| `NEXT_PUBLIC_SYNC_URL` | `wss://<sync>` (same host as the sync URL, with `wss://`) |
+
+### 5. Before a demo
+
+Open `https://<gateway>/health` and wait for `{"status":"ok"}`. That wakes the gateway, so the
+first playground request doesn't wait a minute and time out. Opening `/editor` wakes the sync
+server.
+
+To use a different free model, change `RELAY_DEFAULT_MODEL` on the gateway to any model ID in
+Groq's console. To add a backup provider, set `RELAY_FALLBACKS` (see `.env.example`).
+
+---
+
+## Paid hosting on Fly.io (the original setup)
 
 Deploys run from GitHub Actions (`.github/workflows/deploy.yml`), so no local CLI is required. The
 workflow is **manual-only**, so merging to `main` can't quietly recreate paid infrastructure.

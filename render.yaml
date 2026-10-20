@@ -1,0 +1,45 @@
+# Free hosting for the gateway and sync server on Render (Dashboard -> New -> Blueprint).
+# Studio stays on Vercel and the database on Neon; see docs/DEPLOY.md "Free hosting".
+# Free web services sleep after 15 minutes without traffic and take about a minute to wake.
+services:
+  - type: web
+    name: relay-gateway
+    runtime: docker
+    plan: free
+    rootDir: services/prompt-ops
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      # The gateway's Dockerfile listens on 8000; PORT tells Render where to send traffic.
+      - key: PORT
+        value: "8000"
+      - key: RELAY_DB_ENABLED
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: RELAY_API_KEYS
+        sync: false
+      # Groq's free tier, through the OpenAI-compatible provider.
+      - key: RELAY_DEFAULT_PROVIDER
+        value: openai
+      - key: OPENAI_BASE_URL
+        value: https://api.groq.com/openai
+      - key: RELAY_DEFAULT_MODEL
+        value: llama-3.1-8b-instant
+      - key: OPENAI_API_KEY
+        sync: false
+      # Stay under Groq's free per-minute request limit.
+      - key: RELAY_RATE_LIMIT_PER_MINUTE
+        value: "25"
+
+  - type: web
+    name: relay-sync
+    runtime: docker
+    plan: free
+    dockerfilePath: ./services/sync-server/Dockerfile
+    dockerContext: .
+    envVars:
+      # Render's default PORT is 10000; make the sync server listen there.
+      - key: SYNC_SERVER_PORT
+        value: "10000"
